@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Gui alert Wazuh vao chat/group Zalo qua Zalo Bot API (bot-api.zaloplatforms.com).
-# integratord goi: custom-zalo <alert_file> <api_key=chat_id> <hook_url=https://bot-api.zaloplatforms.com/bot<token>/sendMessage>
+# integratord goi: custom-zalo <alert_file> <api_key=chat_id> <hook_url=https://bot-api.zaloplatforms.com>
+# Token bot doc tu TOKEN_FILE, khong de trong ossec.conf: ai co quyen manager:read tren Wazuh API
+# (ke ca role readonly) deu doc duoc ossec.conf qua dashboard.
 import json
 import os
 import re
@@ -15,6 +17,7 @@ MAX_LOG = 500
 # CA bundle cua host (compose mount vao). Mang co SSL inspection thi CA cua proxy chi nam
 # trong trust store cua host, Python cua Wazuh khong biet -> CERTIFICATE_VERIFY_FAILED.
 HOST_CA = "/etc/ssl/host-ca-bundle.crt"
+TOKEN_FILE = "/run/secrets/zalo_token"
 
 CORAZA_RE = re.compile(r'\[id "(\d+)"\].*?\[msg "([^"]*)"\].*?\[data "([^"]*)"\]')
 SKIP_RULES = {"949110", "980170", "980130"}  # rule tong hop anomaly score, khong co payload
@@ -90,13 +93,18 @@ def main():
         alert = json.load(f)
 
     body = json.dumps({"chat_id": chat_id, "text": build_message(alert)}).encode()
-    req = urllib.request.Request(hook_url, data=body, headers={"Content-Type": "application/json"})
+    url = hook_url
+    # hook_url cu co san /bot<token>/sendMessage thi dung nguyen
+    if "/sendMessage" not in hook_url and os.path.isfile(TOKEN_FILE):
+        with open(TOKEN_FILE) as f:
+            url = f"{hook_url.rstrip('/')}/bot{f.read().strip()}/sendMessage"
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
         ctx = ssl.create_default_context(cafile=HOST_CA) if os.path.isfile(HOST_CA) else None
         with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             raw = resp.read()
     except urllib.error.HTTPError as err:
-        # Khong ghi hook_url vao log vi chua bot token
+        # Khong ghi url vao log vi chua bot token
         log(f"Zalo tra HTTP {err.code}: {err.read()[:300]!r}")
         sys.exit(1)
     except Exception as err:

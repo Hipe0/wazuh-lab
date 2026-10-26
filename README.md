@@ -145,6 +145,26 @@ Hạn chế: rule 100311 chỉ bắt được khi cả pipe nằm trong 1 comman
 
 Lưu ý dung lượng: config Sysmon trên aidt01 đang để exclude-mode (log gần như mọi thứ), khoảng 400k event trong 3,5 giờ. Nên tinh chỉnh config Sysmon (vd dựa trên MSTIC SysmonForLinux) để giảm event rác.
 
+## 4c. Tài khoản cho người khác thêm rule (`add-rule-user.sh`)
+
+```bash
+./add-rule-user.sh tuan        # in ra user + password random; chạy lại cùng tên = đặt lại password
+```
+
+Người đó đăng nhập dashboard, vào **Server management > Rules** (hoặc Decoders, CDB lists) để thêm file, xong bấm **Restart** để manager nạp rule.
+
+| Lớp | Cấp gì |
+|---|---|
+| Indexer (đăng nhập dashboard) | Role `wazuh_rule_editor`: chỉ đọc index `wazuh-*`, không ghi được index, không quản lý user |
+| Wazuh API (RBAC) | Role `readonly` + `rule_editor`: đọc/ghi file rule, decoder, CDB list; kiểm tra config và restart manager. Không sửa được `ossec.conf`, không tạo user, không xóa file rule, không xóa agent |
+
+Đã test bằng API đúng như dashboard gọi (run_as): upload rule, restart manager được; sửa `ossec.conf`, tạo user API, xóa file rule bị 403.
+
+Quy ước cho người thêm rule:
+- **Tạo file mới** (vd `tuan_rules.xml`), đừng sửa `local_rules.xml`: file đó do repo quản lý, mỗi lần recreate manager sẽ bị ghi đè bằng bản trong git.
+- Dùng rule ID 100400–100999 (100200–100399 lab đang dùng).
+- Rule lỗi cú pháp thì manager không lên lại được: dashboard có kiểm tra config trước khi restart, nhưng vẫn nên test bằng **Ruleset test** trước.
+
 ## 5. Đổi cấu hình
 
 | Sửa gì | Làm gì |
@@ -159,7 +179,7 @@ Lưu ý: dùng `--force-recreate` chứ đừng chỉ `restart` manager, lúc te
 ## 6. Mấy điểm cần biết
 
 - **SecAuditLogRelevantStatus** dùng regex Go (RE2), không có lookahead `(?!...)` như ModSecurity. Đã viết lại thành `^(?:5|40[0-35-9]|4[1-9])` (4xx trừ 404, và 5xx).
-- **Token bot Zalo nằm trong `wazuh_manager.conf`** (file đã được `chmod 600`, có trong `.gitignore`), và Wazuh in nguyên URL có token vào `ossec.log` khi gọi integration lỗi. Đừng gửi log đó cho người khác mà chưa che token.
+- **Token bot Zalo không nằm trong `ossec.conf`**: user có quyền `manager:read` trên Wazuh API (kể cả role `readonly`) đọc được toàn bộ `ossec.conf` qua dashboard. `setup.sh` ghi token ra `secrets/zalo.token` (thư mục 700, có trong `.gitignore`), compose mount vào `/run/secrets/zalo_token`, `custom-zalo.py` tự ghép URL. Nhớ chạy `./setup.sh` trước khi `docker compose up`, thiếu file này docker sẽ tạo thư mục rỗng thay vào.
 - **TLS khi gửi Zalo**: Python trong image Wazuh báo `CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain` khi gọi bot-api.zaloplatforms.com (gặp trên server aidt01), dù curl trên host chạy bình thường. Vì vậy compose mount trust store của host (`HOST_CA_BUNDLE`, mặc định `/etc/ssl/certs/ca-certificates.crt`) vào manager, và integration dùng nó làm cafile. Vẫn verify cert, không tắt kiểm tra.
 - **Agent giữ `client.keys` trong volume `wazuh_agent_etc`**: nếu không, mỗi lần recreate agent sẽ enroll lại với cùng tên `lab-host`, manager báo `Duplicate agent name` và agent nằm Disconnected (gặp trên aidt01). Lỡ bị rồi thì xóa agent cũ: `docker compose exec wazuh.manager /var/ossec/bin/manage_agents -r 001` rồi recreate agent.
 - **Audit log quá lớn**: Wazuh cắt event > 64KB, JSON bị cắt sẽ không decode được. Request body to (upload file) có thể rơi vào trường hợp này.
@@ -178,6 +198,8 @@ wazuh-lab/
 ├── docker-compose.yml
 ├── setup.sh               # .env, cert, hash password, render config
 ├── enable-sysmon.sh       # rsyslog tách log Sysmon for Linux cho agent (sudo)
+├── add-rule-user.sh       # tạo tài khoản dashboard chỉ được thêm/sửa rule
+├── scripts/add_rule_user.py
 ├── waf/{Dockerfile,Caddyfile}
 └── config/
     ├── wazuh_indexer/wazuh.indexer.yml        (internal_users.yml do setup.sh sinh)

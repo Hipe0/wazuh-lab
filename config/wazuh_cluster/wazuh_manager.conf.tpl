@@ -287,10 +287,12 @@
     <ssl_auto_negotiate>no</ssl_auto_negotiate>
   </auth>
 
-  <!-- Day alert ve Zalo Bot. __ZALO_*__ duoc setup.sh thay tu .env -->
+  <!-- Day alert ve Zalo Bot. __ZALO_*__ duoc setup.sh thay tu .env.
+       Token bot KHONG de o day (user readonly doc duoc ossec.conf qua API), custom-zalo.py doc
+       tu /run/secrets/zalo_token (setup.sh ghi ra secrets/zalo.token) -->
   <integration>
     <name>custom-zalo</name>
-    <hook_url>https://bot-api.zaloplatforms.com/bot__ZALO_BOT_TOKEN__/sendMessage</hook_url>
+    <hook_url>https://bot-api.zaloplatforms.com</hook_url>
     <api_key>__ZALO_CHAT_ID__</api_key>
     <level>__ZALO_MIN_LEVEL__</level>
     <alert_format>json</alert_format>

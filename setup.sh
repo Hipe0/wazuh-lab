@@ -112,12 +112,16 @@ fi
 STRIP_INT=()
 [ -z "${ZALO_BOT_TOKEN:-}" ] || [ -z "${ZALO_CHAT_ID:-}" ] && STRIP_INT=(-e '/<integration>/,/<\/integration>/d')
 sed "${STRIP_INT[@]}" \
-    -e "s|__ZALO_BOT_TOKEN__|${ZALO_BOT_TOKEN:-}|" \
     -e "s|__ZALO_CHAT_ID__|${ZALO_CHAT_ID:-}|" \
     -e "s|__ZALO_MIN_LEVEL__|${ZALO_MIN_LEVEL:-7}|" \
     -e "s|__CLUSTER_KEY__|${CLUSTER_KEY}|" \
     config/wazuh_cluster/wazuh_manager.conf.tpl > config/wazuh_cluster/wazuh_manager.conf
 printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
+# Token Zalo de file rieng, compose mount vao /run/secrets/zalo_token. Thu muc secrets 700 chan
+# user khac tren host; file 644 de user wazuh trong container (uid khac) doc duoc.
+install -d -m 700 secrets
+printf '%s' "${ZALO_BOT_TOKEN:-}" > secrets/zalo.token
+chmod 644 secrets/zalo.token
 chmod 600 config/wazuh_cluster/wazuh_manager.conf config/wazuh_cluster/authd.pass
 # integratord chay bang user wazuh, file mount vao la root:root nen phai cho other doc+chay
 chmod 755 config/wazuh_cluster/integrations/custom-zalo config/wazuh_cluster/integrations/custom-zalo.py
