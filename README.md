@@ -5,9 +5,9 @@ Một VM chạy hết: Wazuh single-node (manager, indexer, dashboard), 1 Wazuh 
 ```
 attacker ──HTTP──> waf (Caddy+Coraza :8080) ──> backend (httpbin)
                      │ audit.log (JSON, volume coraza_logs)
-host /var/log/auth.log ┐
-                       ├─> wazuh.agent ──1514──> wazuh.manager ──> wazuh.indexer <── wazuh.dashboard (:443)
-coraza_logs ───────────┘                          └─ integratord ──> Zalo Bot API ──> chat/group
+host auth.log, sysmon.log ┐
+                          ├─> wazuh.agent ──1514──> wazuh.manager ──> wazuh.indexer <── wazuh.dashboard (:8443)
+coraza_logs ──────────────┘                          └─ integratord ──> Zalo Bot API ──> chat/group
 ```
 
 Đã chạy thử toàn bộ stack trên cả Docker rootful lẫn rootless (Wazuh 4.14.9, Caddy 2.11.7, coraza-caddy v2.6.2, CRS 4.25.0): agent enroll được, sshd fail/brute force và SQLi/XSS/LFI qua WAF đều ra alert, tin nhắn Zalo gửi đúng format API (test bằng mock server, sandbox không gọi được bot-api.zaloplatforms.com).
@@ -118,11 +118,38 @@ Log Coraza được đọc bằng `log_format json` nên Wazuh tự tách field 
 
 Ngưỡng gửi Zalo: `ZALO_MIN_LEVEL` trong `.env` (mặc định 7, tức bỏ qua sshd fail lẻ level 5).
 
+## 4b. Sysmon for Linux (`enable-sysmon.sh`)
+
+Sysmon for Linux ghi mỗi event thành 1 dòng XML vào syslog (`program_name` = `sysmon`). Container rootless không đọc được `/var/log/syslog`, nên `enable-sysmon.sh` cho rsyslog copy riêng event Sysmon sang `/var/log/wazuh-lab/sysmon.log` (bỏ EventID 4, 5, 16 vì nhiều mà không có giá trị phát hiện) và thêm logrotate (hằng ngày, tối đa 500MB, giữ 2 bản).
+
+```bash
+./enable-sysmon.sh
+docker compose up -d --force-recreate wazuh.manager wazuh.agent
+```
+
+Wazuh chỉ có sẵn decoder cho Sysmon trên Windows (eventchannel), nên lab tự viết decoder `config/wazuh_cluster/decoders/local_decoder.xml`, tách các field `sysmon.eventid`, `sysmon.image`, `sysmon.commandline`, `sysmon.user`, `sysmon.parentimage`, `sysmon.parentcommandline`, `sysmon.destinationip`, `sysmon.destinationport`, `sysmon.targetfilename`.
+
+| Rule | Level | Khi nào |
+|---|---|---|
+| 100300 / 100301 | 0 | Mọi event Sysmon / ProcessCreate (gốc để rule con bám vào, không alert) |
+| 100310 | 12 | Reverse shell: `/dev/tcp/`, `bash -i`, `nc -e`, `pty.spawn`, `socat exec:` (T1059.004) |
+| 100311 | 10 | `curl`/`wget` pipe vào shell (T1105) |
+| 100312 | 10 | Đọc `/etc/shadow`, `/etc/gshadow`, `.ssh/id_*` (T1003.008) |
+| 100313 | 8 | Chạy `useradd`/`usermod`/`passwd`... (T1136.001) |
+| 100320 | 10 | Kết nối ra port hay dùng cho C2/reverse shell: 4444, 4445, 1337, 31337, 5555, 6666, 9001 (T1571) |
+| 100330 | 10 | Tạo file trong cron, systemd, `authorized_keys`, `sudoers.d` (T1053.003) |
+
+Test vô hại (không kết nối đi đâu, chỉ có chuỗi trong commandline): `bash -c 'true /dev/tcp/203.0.113.9/4444'` → rule 100310 về Zalo.
+
+Hạn chế: rule 100311 chỉ bắt được khi cả pipe nằm trong 1 commandline (vd `bash -c "curl ... | sh"`). Gõ thẳng `curl ... | sh` trong shell thì Sysmon thấy 2 process riêng, rule không nối lại được.
+
+Lưu ý dung lượng: config Sysmon trên aidt01 đang để exclude-mode (log gần như mọi thứ), khoảng 400k event trong 3,5 giờ. Nên tinh chỉnh config Sysmon (vd dựa trên MSTIC SysmonForLinux) để giảm event rác.
+
 ## 5. Đổi cấu hình
 
 | Sửa gì | Làm gì |
 |---|---|
-| `local_rules.xml`, `.tpl`, `.env` (Zalo) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
+| `local_rules.xml`, `local_decoder.xml`, `.tpl`, `.env` (Zalo) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
 | `waf/Caddyfile` | `docker compose restart waf` (file được mount, không cần build lại) |
 | `WAF_MODE=On` (chặn thật) / `WAF_UPSTREAM` | sửa `.env` rồi `docker compose up -d waf` |
 | Password trong `.env` sau khi đã chạy | Phải `docker compose down -v`, xóa `config/wazuh_indexer/internal_users.yml`, chạy lại `./setup.sh`. Indexer chỉ đọc `internal_users.yml` lần khởi tạo đầu tiên. |
@@ -138,7 +165,8 @@ Lưu ý: dùng `--force-recreate` chứ đừng chỉ `restart` manager, lúc te
 - **SCA đã tắt** trên cả manager lẫn agent: nó chấm CIS cho OS của container (Amazon Linux), không liên quan tới VM của mày, và lần đầu chạy bắn khoảng 180 alert level 7.
 - Cert key để mode 644 vì indexer/dashboard chạy bằng uid 1000 trong container (rootless thì map sang subuid trên host, không phải owner của file). Lab thì được, đừng dùng y nguyên cho môi trường thật.
 - Muốn bảo vệ app thật thay cho httpbin: đặt `WAF_UPSTREAM=https://...` và thêm `header_up Host` + `transport http { tls_server_name ... }` như Caddyfile của lab WAF cũ (`waf-lab/README.md` trong project).
-- Sysmon: lab này chưa đọc log Sysmon. Sysmon cài trên Windows thì cần cài Wazuh agent cho Windows và thêm `<localfile><location>Microsoft-Windows-Sysmon/Operational</location><log_format>eventchannel</log_format></localfile>`. Sysmon for Linux thì đọc qua syslog.
+- Sysmon trên Windows thì cần cài Wazuh agent cho Windows và thêm `<localfile><location>Microsoft-Windows-Sysmon/Operational</location><log_format>eventchannel</log_format></localfile>`. Sysmon for Linux xem mục 4b.
+- **Decoder Wazuh không giải mã `&lt;`/`&gt;`** trong regex, nên `local_decoder.xml` viết `<`/`>` dạng `\x3c`/`\x3e` (pcre2).
 
 ## Cấu trúc
 
@@ -148,13 +176,15 @@ wazuh-lab/
 ├── install-rootless.sh    # cài Docker rootless + chuẩn bị host (sudo)
 ├── docker-compose.yml
 ├── setup.sh               # .env, cert, hash password, render config
+├── enable-sysmon.sh       # rsyslog tách log Sysmon for Linux cho agent (sudo)
 ├── waf/{Dockerfile,Caddyfile}
 └── config/
     ├── wazuh_indexer/wazuh.indexer.yml        (internal_users.yml do setup.sh sinh)
     ├── wazuh_dashboard/opensearch_dashboards.yml
-    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log)
+    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log + sysmon.log)
     └── wazuh_cluster/
         ├── wazuh_manager.conf.tpl             (auth dùng password, block integration Zalo)
         ├── rules/local_rules.xml
+        ├── decoders/local_decoder.xml         (decoder Sysmon for Linux)
         └── integrations/custom-zalo{,.py}
 ```

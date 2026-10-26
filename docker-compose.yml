@@ -42,6 +42,7 @@ services:
       - ./config/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
       - ./config/wazuh_cluster/authd.pass:/wazuh-config-mount/etc/authd.pass
       - ./config/wazuh_cluster/rules/local_rules.xml:/wazuh-config-mount/etc/rules/local_rules.xml
+      - ./config/wazuh_cluster/decoders/local_decoder.xml:/wazuh-config-mount/etc/decoders/local_decoder.xml
       # Mount thang (khong qua config-mount) de giu quyen 755, integratord chay bang user wazuh
       - ./config/wazuh_cluster/integrations/custom-zalo:/var/ossec/integrations/custom-zalo:ro
       - ./config/wazuh_cluster/integrations/custom-zalo.py:/var/ossec/integrations/custom-zalo.py:ro

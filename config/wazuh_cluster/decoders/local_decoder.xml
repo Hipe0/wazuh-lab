@@ -1,0 +1,65 @@
+<!--
+  Decoder cho Sysmon for Linux. Sysmon ghi 1 event XML / dong qua syslog voi program_name "sysmon":
+  <ts> <host> sysmon: <Event><System>...<EventID>1</EventID>...</System><EventData><Data Name="Image">...</Data>...
+  Wazuh chi co decoder cho Sysmon Windows (eventchannel), nen phai tu viet.
+  Moi decoder con (cung ten) lay 1 field; field nao khong co trong event thi bo qua.
+  Dau < > viet bang \x3c \x3e (PCRE2): XML parser cua Wazuh khong giai ma &lt; &gt;.
+-->
+<decoder name="sysmon-linux">
+  <program_name>^sysmon$</program_name>
+  <prematch type="pcre2">^\x3cEvent\x3e\x3cSystem\x3e\x3cProvider Name="Linux-Sysmon"</prematch>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">\x3cEventID\x3e(\d+)\x3c/EventID\x3e</regex>
+  <order>sysmon.eventid</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="Image"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.image</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="CommandLine"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.commandline</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="User"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.user</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="ParentImage"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.parentimage</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="ParentCommandLine"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.parentcommandline</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="DestinationIp"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.destinationip</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="DestinationPort"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.destinationport</order>
+</decoder>
+
+<decoder name="sysmon-linux-field">
+  <parent>sysmon-linux</parent>
+  <regex type="pcre2">Name="TargetFilename"\x3e([^\x3c]*)\x3c</regex>
+  <order>sysmon.targetfilename</order>
+</decoder>

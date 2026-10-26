@@ -65,3 +65,75 @@
   </rule>
 
 </group>
+
+<!--
+  Rule cho Sysmon for Linux (decoder sysmon-linux trong local_decoder.xml). ID 100300-100399.
+  Sysmon tren server ghi rat nhieu event (moi process, moi ket noi), nen rule goc de level 0
+  (khong tao alert) va chi bat cac hanh vi dang ngo.
+-->
+<group name="sysmon,sysmon_linux,">
+
+  <rule id="100300" level="0">
+    <decoded_as>sysmon-linux</decoded_as>
+    <description>Sysmon Linux: event $(sysmon.eventid)</description>
+  </rule>
+
+  <!-- EventID 1: ProcessCreate -->
+  <rule id="100301" level="0">
+    <if_sid>100300</if_sid>
+    <field name="sysmon.eventid">^1$</field>
+    <description>Sysmon Linux: tao process $(sysmon.image)</description>
+  </rule>
+
+  <rule id="100310" level="12">
+    <if_sid>100301</if_sid>
+    <field name="sysmon.commandline" type="pcre2">/dev/(tcp|udp)/|\bbash -i\b|\bn(c|cat)\b.*\s-(e|c)\s|pty\.spawn|socat\b.*exec:|\bsh -i\b</field>
+    <description>Sysmon Linux: nghi reverse shell - $(sysmon.user) chay: $(sysmon.commandline)</description>
+    <mitre><id>T1059.004</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <rule id="100311" level="10">
+    <if_sid>100301</if_sid>
+    <field name="sysmon.commandline" type="pcre2">\b(curl|wget)\b.*\|\s*(sudo\s+)?(ba|z|da)?sh\b</field>
+    <description>Sysmon Linux: tai script ve chay thang (curl/wget | sh) - $(sysmon.user): $(sysmon.commandline)</description>
+    <mitre><id>T1105</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <rule id="100312" level="10">
+    <if_sid>100301</if_sid>
+    <field name="sysmon.commandline" type="pcre2">/etc/shadow|/etc/gshadow|\.ssh/id_(rsa|ed25519|ecdsa)\b</field>
+    <description>Sysmon Linux: truy cap file nhay cam - $(sysmon.user): $(sysmon.commandline)</description>
+    <mitre><id>T1003.008</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <rule id="100313" level="8">
+    <if_sid>100301</if_sid>
+    <field name="sysmon.image" type="pcre2">/(useradd|adduser|usermod|userdel|passwd|chpasswd)$</field>
+    <description>Sysmon Linux: thay doi tai khoan - $(sysmon.user): $(sysmon.commandline)</description>
+    <mitre><id>T1136.001</id></mitre>
+  </rule>
+
+  <!-- EventID 3: NetworkConnect toi port hay dung cho reverse shell / C2 -->
+  <rule id="100320" level="10">
+    <if_sid>100300</if_sid>
+    <field name="sysmon.eventid">^3$</field>
+    <field name="sysmon.destinationport" type="pcre2">^(4444|4445|1337|31337|5555|6666|9001)$</field>
+    <description>Sysmon Linux: $(sysmon.image) ket noi toi $(sysmon.destinationip):$(sysmon.destinationport) (port hay dung cho reverse shell/C2)</description>
+    <mitre><id>T1571</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <!-- EventID 11: FileCreate o vi tri persistence -->
+  <rule id="100330" level="10">
+    <if_sid>100300</if_sid>
+    <field name="sysmon.eventid">^11$</field>
+    <field name="sysmon.targetfilename" type="pcre2">^/etc/(cron\.(d|daily|hourly|weekly|monthly)/|crontab$)|^/var/spool/cron/|^/etc/systemd/system/|/\.ssh/authorized_keys$|^/etc/sudoers\.d/</field>
+    <description>Sysmon Linux: tao file o vi tri persistence $(sysmon.targetfilename) boi $(sysmon.image)</description>
+    <mitre><id>T1053.003</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+</group>
