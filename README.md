@@ -174,10 +174,12 @@ Quy ước cho người thêm rule:
 
 | Sửa gì | Làm gì |
 |---|---|
-| `local_rules.xml`, `local_decoder.xml`, `.tpl`, `.env` (Zalo) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
+| `local_rules.xml`, `local_decoder.xml`, `custom-zalo.py`, `.tpl`, `.env` (Zalo) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
 | `waf/Caddyfile` | `docker compose restart waf` (file được mount, không cần build lại) |
 | `WAF_MODE=On` (chặn thật) / `WAF_UPSTREAM` | sửa `.env` rồi `docker compose up -d waf` |
 | Password trong `.env` sau khi đã chạy | Phải `docker compose down -v`, xóa `config/wazuh_indexer/internal_users.yml`, chạy lại `./setup.sh`. Indexer chỉ đọc `internal_users.yml` lần khởi tạo đầu tiên. |
+
+Sau `git pull` cũng phải recreate: compose mount từng file, git ghi file mới bằng inode mới nên container vẫn thấy bản cũ.
 
 Lưu ý: dùng `--force-recreate` chứ đừng chỉ `restart` manager, lúc test `restart` không chắc copy lại file config.
 
