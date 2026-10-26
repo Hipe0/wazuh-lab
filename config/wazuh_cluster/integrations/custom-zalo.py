@@ -21,6 +21,11 @@ TOKEN_FILE = "/run/secrets/zalo_token"
 
 CORAZA_RE = re.compile(r'\[id "(\d+)"\].*?\[msg "([^"]*)"\].*?\[data "([^"]*)"\]')
 SKIP_RULES = {"949110", "980170", "980130"}  # rule tong hop anomaly score, khong co payload
+SYSMON_FIELDS = [
+    ("eventid", "EventID"), ("user", "User"), ("image", "Image"), ("commandline", "CommandLine"),
+    ("parentimage", "Parent"), ("parentcommandline", "ParentCmd"),
+    ("destinationip", "DstIP"), ("destinationport", "DstPort"), ("targetfilename", "File"),
+]
 
 
 def log(msg):
@@ -75,7 +80,13 @@ def build_message(alert):
     if groups:
         lines.append(f"Groups: {', '.join(groups)}")
     full_log = alert.get("full_log")
-    if full_log and get(alert, "data.transaction"):
+    sysmon = get(alert, "data.sysmon")
+    if isinstance(sysmon, dict):
+        # Log Sysmon la XML dai, cat 500 ky tu chi con header <System>: in field da decode
+        for key, label in SYSMON_FIELDS:
+            if sysmon.get(key) not in (None, "", "-"):
+                lines.append(f"{label}: {str(sysmon[key])[:300]}")
+    elif full_log and get(alert, "data.transaction"):
         for rid, msg, data in coraza_matches(full_log):
             lines.append(f"- CRS {rid}: {msg}\n  {data[:200]}")
     elif full_log:
