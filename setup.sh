@@ -48,6 +48,9 @@ if ! grep -q '^ZALO_CHAT_ID=' .env; then
 fi
 
 set -a; . ./.env; set +a
+# Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
+# lo dan ca "bot" vao .env thi bo di de URL khong thanh "botbot..."
+ZALO_BOT_TOKEN="${ZALO_BOT_TOKEN#bot}"
 
 # 2. Cert TLS cho indexer/manager/dashboard (tu ky bang openssl, DN khop voi wazuh.indexer.yml)
 CERT_DIR=config/wazuh_indexer_ssl_certs
