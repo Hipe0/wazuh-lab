@@ -1,0 +1,31 @@
+{
+	order coraza_waf first
+	auto_https off
+}
+
+:80 {
+	log {
+		output stdout
+		format json
+	}
+
+	coraza_waf {
+		load_owasp_crs
+		directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+			SecRuleEngine {$WAF_MODE:DetectionOnly}
+			SecRequestBodyAccess On
+			SecResponseBodyAccess Off
+			SecAuditEngine RelevantOnly
+			SecAuditLogRelevantStatus "^(?:5|40[0-35-9]|4[1-9])"
+			SecAuditLogParts ABIJDEFHZ
+			SecAuditLogType Serial
+			SecAuditLogFormat JSON
+			SecAuditLog /var/log/coraza/audit.log
+		`
+	}
+
+	reverse_proxy {$WAF_UPSTREAM:http://backend:8080}
+}

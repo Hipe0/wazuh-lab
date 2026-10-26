@@ -1,0 +1,67 @@
+<!--
+  Rule cho audit log JSON cua Coraza WAF (lab wazuh-lab).
+  Event do agent doc /var/log/coraza/audit.log voi log_format json, decoder json tu bat field.
+  ID custom dung dai 100000-120000.
+-->
+<group name="coraza,waf,web,">
+
+  <!-- Goc: moi transaction Coraza ghi audit log -->
+  <rule id="100200" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="log_source">^coraza$</field>
+    <field name="transaction.id">\.+</field>
+    <description>Coraza WAF: transaction tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+  </rule>
+
+  <!-- CRS danh gia anomaly score vuot nguong (rule 949110) = request bi coi la tan cong -->
+  <!-- ../etc/passwd khop ca tag LFI lan RCE. Wazuh xet rule con level cao truoc, cung level thi theo thu tu,
+       nen LFI de level 12 va dat truoc RCE -->
+  <rule id="100201" level="10">
+    <if_sid>100200</if_sid>
+    <match>Inbound Anomaly Score Exceeded</match>
+    <description>Coraza WAF: request vuot anomaly score tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+    <group>attack,</group>
+  </rule>
+
+  <rule id="100210" level="10">
+    <if_sid>100201</if_sid>
+    <match>attack-sqli</match>
+    <description>Coraza WAF: SQL injection tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+    <mitre><id>T1190</id></mitre>
+    <group>attack,sql_injection,</group>
+  </rule>
+
+  <rule id="100211" level="10">
+    <if_sid>100201</if_sid>
+    <match>attack-xss</match>
+    <description>Coraza WAF: XSS tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+    <mitre><id>T1190</id></mitre>
+    <group>attack,xss,</group>
+  </rule>
+
+  <rule id="100212" level="12">
+    <if_sid>100201</if_sid>
+    <match>attack-lfi</match>
+    <description>Coraza WAF: Path traversal / LFI tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+    <mitre><id>T1190</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <rule id="100213" level="12">
+    <if_sid>100201</if_sid>
+    <match>attack-rce</match>
+    <description>Coraza WAF: Remote command execution tu $(transaction.client_ip) $(transaction.request.method) $(transaction.request.uri)</description>
+    <mitre><id>T1190</id></mitre>
+    <group>attack,</group>
+  </rule>
+
+  <!-- Nhieu request tan cong tu cung 1 IP trong 60s = scanner (sqlmap, nikto...) -->
+  <rule id="100220" level="12" frequency="8" timeframe="60">
+    <if_matched_group>attack</if_matched_group>
+    <same_field>transaction.client_ip</same_field>
+    <description>Coraza WAF: nhieu request tan cong tu $(transaction.client_ip) trong 60s (kha nang scanner)</description>
+    <mitre><id>T1595</id></mitre>
+    <group>attack,web_scan,</group>
+  </rule>
+
+</group>
