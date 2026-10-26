@@ -105,7 +105,8 @@ if has docker && docker compose version >/dev/null 2>&1; then
 else WARN "Chua co docker compose plugin"; FIX "sudo apt install -y docker-compose-plugin"; fi
 if has dockerd-rootless-setuptool.sh; then OK "docker-ce-rootless-extras da cai"; else WARN "Chua co docker-ce-rootless-extras"; FIX "sudo apt install -y docker-ce-rootless-extras"; fi
 if { has systemctl && systemctl is-active --quiet docker.service 2>/dev/null; } || [ -S /var/run/docker.sock ]; then
-  n="$(sudo -n docker ps -q 2>/dev/null | wc -l || true)"
+  # sudo -n that bai (chua nhap password) thi khong biet so container, dung in 0 gay hieu nham
+  if out="$(sudo -n docker ps -q 2>/dev/null)"; then n="$(printf '%s' "$out" | grep -c . || true)"; else n="khong biet (chay 'sudo docker ps' de xem)"; fi
   WARN "Docker rootful dang chay (docker.service). Container dang chay: ${n:-khong kiem tra duoc (can sudo)}"
   FIX "Neu server KHONG dung rootful: install-rootless.sh --disable-rootful. Neu con dung: --keep-rootful (chay song song)"
 else OK "Khong co Docker rootful dang chay"; fi

@@ -82,8 +82,10 @@ fi
 grep -E "^$USER_NAME:" /etc/subuid /etc/subgid
 
 # ---------------------------------------------------------------------------
+# Server da co profile rootlesskit (ten bat ky) thi khong tao them, tranh 2 profile cung path
 if [ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] && \
-   [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1 ]; then
+   [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1 ] && \
+   ! grep -lqs rootlesskit /etc/apparmor.d/* 2>/dev/null; then
   step "AppArmor profile cho rootlesskit (Ubuntu 23.10+ chan unprivileged userns)"
   sudo tee /etc/apparmor.d/usr.bin.rootlesskit >/dev/null <<'EOF'
 abi <abi/4.0>,
@@ -100,8 +102,13 @@ fi
 
 # ---------------------------------------------------------------------------
 step "sysctl: vm.max_map_count cho Wazuh indexer"
-echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-wazuh-lab.conf >/dev/null
-sudo sysctl -q -p /etc/sysctl.d/99-wazuh-lab.conf
+# Chi nang len, khong ha gia tri server dang dat cao hon (vd 1048576)
+if [ "$(cat /proc/sys/vm/max_map_count)" -lt 262144 ]; then
+  echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-wazuh-lab.conf >/dev/null
+  sudo sysctl -q -p /etc/sysctl.d/99-wazuh-lab.conf
+else
+  echo "    Dang la $(cat /proc/sys/vm/max_map_count), giu nguyen"
+fi
 
 step "Bat linger: Docker rootless chay ca khi logout"
 sudo loginctl enable-linger "$USER_NAME"
