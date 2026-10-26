@@ -2,7 +2,9 @@
 # Gui alert Wazuh vao chat/group Zalo qua Zalo Bot API (bot-api.zaloplatforms.com).
 # integratord goi: custom-zalo <alert_file> <api_key=chat_id> <hook_url=https://bot-api.zaloplatforms.com/bot<token>/sendMessage>
 import json
+import os
 import re
+import ssl
 import sys
 import urllib.error
 import urllib.request
@@ -10,6 +12,9 @@ import urllib.request
 LOG_FILE = "/var/ossec/logs/integrations.log"
 MAX_TEXT = 2000  # gioi han text cua sendMessage
 MAX_LOG = 500
+# CA bundle cua host (compose mount vao). Mang co SSL inspection thi CA cua proxy chi nam
+# trong trust store cua host, Python cua Wazuh khong biet -> CERTIFICATE_VERIFY_FAILED.
+HOST_CA = "/etc/ssl/host-ca-bundle.crt"
 
 CORAZA_RE = re.compile(r'\[id "(\d+)"\].*?\[msg "([^"]*)"\].*?\[data "([^"]*)"\]')
 SKIP_RULES = {"949110", "980170", "980130"}  # rule tong hop anomaly score, khong co payload
@@ -87,7 +92,8 @@ def main():
     body = json.dumps({"chat_id": chat_id, "text": build_message(alert)}).encode()
     req = urllib.request.Request(hook_url, data=body, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        ctx = ssl.create_default_context(cafile=HOST_CA) if os.path.isfile(HOST_CA) else None
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             raw = resp.read()
     except urllib.error.HTTPError as err:
         # Khong ghi hook_url vao log vi chua bot token

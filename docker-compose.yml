@@ -45,6 +45,8 @@ services:
       # Mount thang (khong qua config-mount) de giu quyen 755, integratord chay bang user wazuh
       - ./config/wazuh_cluster/integrations/custom-zalo:/var/ossec/integrations/custom-zalo:ro
       - ./config/wazuh_cluster/integrations/custom-zalo.py:/var/ossec/integrations/custom-zalo.py:ro
+      # Trust store cua host cho integration Zalo (can khi mang chen CA rieng de soi SSL)
+      - ${HOST_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/host-ca-bundle.crt:ro
 
   wazuh.indexer:
     image: wazuh/wazuh-indexer:${WAZUH_VERSION}
