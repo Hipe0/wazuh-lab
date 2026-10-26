@@ -1,0 +1,64 @@
+<!--
+  Config Sysmon for Linux cho lab Wazuh (aidt01). Ap dung: sudo sysmon -c sysmon/sysmon-config.xml
+  Thay cho config "log het" ban dau. Do tren 200k dong syslog (26/10): FileCreate 87k,
+  ProcessTerminate 60k, FileDelete 23k, ProcessCreate 22k, NetworkConnect 7k.
+  - ProcessCreate: giu, chi bo process cua container runtime / s6-overlay (container Wazuh) / Go build.
+    Khong bo bash, sh, ps, curl, busybox: rule 100310-100313 can chung.
+  - NetworkConnect: giu, bo ket noi noi bo cua stack Wazuh. Rule 100320 can.
+  - FileCreate: chi log o cac duong dan persistence (rule 100330).
+  - ProcessTerminate, FileDelete: tat, khong rule nao dung.
+  - RawAccessRead, ProcessAccess (ptrace): giu nguyen, gan nhu khong co event.
+-->
+<Sysmon schemaversion="4.81">
+  <EventFiltering>
+
+    <RuleGroup name="" groupRelation="or">
+      <ProcessCreate onmatch="exclude">
+        <Image condition="is">/usr/bin/runc</Image>
+        <Image condition="is">/usr/sbin/runc</Image>
+        <Image condition="is">/runc</Image>
+        <Image condition="begin with">/usr/local/go/pkg/tool/</Image>
+        <!-- s6-overlay/execline trong image Wazuh chay healthcheck lien tuc -->
+        <Image condition="begin with">/usr/bin/s6-</Image>
+        <Image condition="is">/usr/bin/if</Image>
+        <Image condition="is">/usr/bin/importas</Image>
+        <Image condition="is">/usr/bin/execlineb</Image>
+      </ProcessCreate>
+    </RuleGroup>
+
+    <RuleGroup name="" groupRelation="or">
+      <NetworkConnect onmatch="exclude">
+        <Image condition="is">/var/ossec/bin/wazuh-modulesd</Image>
+        <Image condition="is">/usr/share/wazuh-indexer/jdk/bin/java</Image>
+        <Image condition="is">/usr/share/wazuh-dashboard/node/bin/node</Image>
+        <Image condition="is">/usr/bin/slirp4netns</Image>
+      </NetworkConnect>
+    </RuleGroup>
+
+    <RuleGroup name="" groupRelation="or">
+      <FileCreate onmatch="include">
+        <TargetFilename condition="begin with">/etc/cron</TargetFilename>
+        <TargetFilename condition="begin with">/var/spool/cron/</TargetFilename>
+        <TargetFilename condition="begin with">/etc/systemd/system/</TargetFilename>
+        <TargetFilename condition="begin with">/etc/sudoers</TargetFilename>
+        <TargetFilename condition="contains">/.ssh/</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- include rong = khong log gi -->
+    <RuleGroup name="" groupRelation="or">
+      <ProcessTerminate onmatch="include"/>
+    </RuleGroup>
+    <RuleGroup name="" groupRelation="or">
+      <FileDelete onmatch="include"/>
+    </RuleGroup>
+
+    <RuleGroup name="" groupRelation="or">
+      <RawAccessRead onmatch="exclude"/>
+    </RuleGroup>
+    <RuleGroup name="" groupRelation="or">
+      <ProcessAccess onmatch="exclude"/>
+    </RuleGroup>
+
+  </EventFiltering>
+</Sysmon>

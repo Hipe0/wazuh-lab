@@ -143,7 +143,12 @@ Test vô hại (không kết nối đi đâu, chỉ có chuỗi trong commandlin
 
 Hạn chế: rule 100311 chỉ bắt được khi cả pipe nằm trong 1 commandline (vd `bash -c "curl ... | sh"`). Gõ thẳng `curl ... | sh` trong shell thì Sysmon thấy 2 process riêng, rule không nối lại được.
 
-Lưu ý dung lượng: config Sysmon trên aidt01 đang để exclude-mode (log gần như mọi thứ), khoảng 400k event trong 3,5 giờ. Nên tinh chỉnh config Sysmon (vd dựa trên MSTIC SysmonForLinux) để giảm event rác.
+Config Sysmon: `sysmon/sysmon-config.xml` thay cho config log hết ban đầu (khoảng 400k event trong 3,5 giờ trên aidt01). Tắt ProcessTerminate, FileDelete; FileCreate chỉ log ở đường dẫn persistence; bỏ process của runc, s6-overlay, Go build và kết nối nội bộ của stack Wazuh. Ước tính giảm khoảng 90% event. Áp dụng:
+
+```bash
+sudo cp /opt/sysmon/config.xml ~/sysmon-config.bak.xml   # backup, quay lại: sudo sysmon -c ~/sysmon-config.bak.xml
+sudo sysmon -c sysmon/sysmon-config.xml
+```
 
 ## 4c. Tài khoản cho người khác thêm rule (`add-rule-user.sh`)
 
@@ -198,6 +203,7 @@ wazuh-lab/
 ├── docker-compose.yml
 ├── setup.sh               # .env, cert, hash password, render config
 ├── enable-sysmon.sh       # rsyslog tách log Sysmon for Linux cho agent (sudo)
+├── sysmon/sysmon-config.xml  # config Sysmon for Linux đã lọc rác
 ├── add-rule-user.sh       # tạo tài khoản dashboard chỉ được thêm/sửa rule
 ├── scripts/add_rule_user.py
 ├── waf/{Dockerfile,Caddyfile}
