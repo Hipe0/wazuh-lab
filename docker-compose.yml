@@ -103,6 +103,9 @@ services:
       - WAZUH_AGENT_NAME=${AGENT_NAME}
     volumes:
       - ./config/wazuh_agent/ossec.conf:/wazuh-config-mount/etc/ossec.conf
+      # Giu client.keys qua cac lan recreate, khong thi agent enroll lai va bi manager tu choi
+      # vi trung ten ("Duplicate agent name")
+      - wazuh_agent_etc:/var/ossec/etc
       # Mount thu muc, khong mount file: logrotate doi inode, mount file se ket o file cu
       - ${AUTH_LOG_DIR}:/var/log/host:ro
       - coraza_logs:/var/log/coraza:ro
@@ -144,3 +147,4 @@ volumes:
   wazuh-dashboard-config:
   wazuh-dashboard-custom:
   coraza_logs:
+  wazuh_agent_etc:
