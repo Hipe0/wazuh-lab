@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Gui alert Wazuh vao chat/group Zalo qua Zalo Bot API (bot-api.zaloplatforms.com).
+# custom-telegram.py dung lai file nay (API Telegram cung kieu: /bot<token>/sendMessage).
 # integratord goi: custom-zalo <alert_file> <api_key=chat_id> <hook_url=https://bot-api.zaloplatforms.com>
 # Token bot doc tu TOKEN_FILE, khong de trong ossec.conf: ai co quyen manager:read tren Wazuh API
 # (ke ca role readonly) deu doc duoc ossec.conf qua dashboard.
@@ -28,9 +29,12 @@ SYSMON_FIELDS = [
 ]
 
 
+LOG_NAME = "custom-zalo"
+
+
 def log(msg):
     with open(LOG_FILE, "a") as f:
-        f.write(f"custom-zalo: {msg}\n")
+        f.write(f"{LOG_NAME}: {msg}\n")
 
 
 def get(d, path, default=None):
@@ -55,7 +59,7 @@ def coraza_matches(full_log, limit=4):
     return out[:limit]
 
 
-def build_message(alert):
+def build_message(alert, max_text=MAX_TEXT):
     # Gui text thuong (khong parse_mode) cho chac, khoi lo escape HTML/Markdown
     rule = alert.get("rule", {})
     level = rule.get("level", 0)
@@ -92,10 +96,12 @@ def build_message(alert):
     elif full_log:
         lines.append(f"Log: {full_log[:MAX_LOG]}")
     text = "\n".join(lines)
-    return text if len(text) <= MAX_TEXT else text[: MAX_TEXT - 3] + "..."
+    return text if len(text) <= max_text else text[: max_text - 3] + "..."
 
 
-def main():
+def main(service="Zalo", token_file=TOKEN_FILE, max_text=MAX_TEXT):
+    global LOG_NAME
+    LOG_NAME = f"custom-{service.lower()}"
     if len(sys.argv) < 4:
         log(f"thieu tham so ({len(sys.argv) - 1})")
         sys.exit(1)
@@ -103,11 +109,11 @@ def main():
     with open(alert_file) as f:
         alert = json.load(f)
 
-    body = json.dumps({"chat_id": chat_id, "text": build_message(alert)}).encode()
+    body = json.dumps({"chat_id": chat_id, "text": build_message(alert, max_text)}).encode()
     url = hook_url
     # hook_url cu co san /bot<token>/sendMessage thi dung nguyen
-    if "/sendMessage" not in hook_url and os.path.isfile(TOKEN_FILE):
-        with open(TOKEN_FILE) as f:
+    if "/sendMessage" not in hook_url and os.path.isfile(token_file):
+        with open(token_file) as f:
             url = f"{hook_url.rstrip('/')}/bot{f.read().strip()}/sendMessage"
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
@@ -116,19 +122,19 @@ def main():
             raw = resp.read()
     except urllib.error.HTTPError as err:
         # Khong ghi url vao log vi chua bot token
-        log(f"Zalo tra HTTP {err.code}: {err.read()[:300]!r}")
+        log(f"{service} tra HTTP {err.code}: {err.read()[:300]!r}")
         sys.exit(1)
     except Exception as err:
-        log(f"loi gui Zalo: {type(err).__name__}: {err}")
+        log(f"loi gui {service}: {type(err).__name__}: {err}")
         sys.exit(1)
-    # Zalo co the tra HTTP 200 nhung ok=false (sai chat_id, bot khong o trong group...)
+    # Zalo co the tra HTTP 200 nhung ok=false (sai chat_id, bot khong o trong group...). Telegram tra 4xx
     try:
         data = json.loads(raw)
     except ValueError:
-        log(f"Zalo tra ve khong phai JSON: {raw[:300]!r}")
+        log(f"{service} tra ve khong phai JSON: {raw[:300]!r}")
         sys.exit(1)
     if not data.get("ok"):
-        log(f"Zalo tu choi: error_code={data.get('error_code')} description={data.get('description')!r}")
+        log(f"{service} tu choi: error_code={data.get('error_code')} description={data.get('description')!r}")
         sys.exit(1)
 
 

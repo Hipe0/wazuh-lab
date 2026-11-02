@@ -287,6 +287,7 @@
     <ssl_auto_negotiate>no</ssl_auto_negotiate>
   </auth>
 
+  <!-- BEGIN zalo (setup.sh xoa khoi nay neu .env chua co token Zalo) -->
   <!-- Day alert ve Zalo Bot. __ZALO_*__ duoc setup.sh thay tu .env.
        Token bot KHONG de o day (user readonly doc duoc ossec.conf qua API), custom-zalo.py doc
        tu /run/secrets/zalo_token (setup.sh ghi ra secrets/zalo.token) -->
@@ -297,6 +298,17 @@
     <level>__ZALO_MIN_LEVEL__</level>
     <alert_format>json</alert_format>
   </integration>
+  <!-- END zalo -->
+
+  <!-- BEGIN telegram. Token doc tu /run/secrets/telegram_token (setup.sh ghi ra secrets/telegram.token) -->
+  <integration>
+    <name>custom-telegram</name>
+    <hook_url>https://api.telegram.org</hook_url>
+    <api_key>__TELEGRAM_CHAT_ID__</api_key>
+    <level>__TELEGRAM_MIN_LEVEL__</level>
+    <alert_format>json</alert_format>
+  </integration>
+  <!-- END telegram -->
 
   <cluster>
     <name>wazuh</name>

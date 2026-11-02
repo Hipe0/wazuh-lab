@@ -1,6 +1,6 @@
-# Lab Wazuh + Coraza WAF + alert Zalo (docker compose)
+# Lab Wazuh + Coraza WAF + alert Zalo/Telegram (docker compose)
 
-Một VM chạy hết: Wazuh single-node (manager, indexer, dashboard), 1 Wazuh agent, Caddy + OWASP Coraza (CRS v4) làm WAF, app demo `go-httpbin` đứng sau WAF. Alert từ level 7 trở lên được bắn về Zalo qua Zalo Bot API.
+Một VM chạy hết: Wazuh single-node (manager, indexer, dashboard), 1 Wazuh agent, Caddy + OWASP Coraza (CRS v4) làm WAF, app demo `go-httpbin` đứng sau WAF. Alert từ level 7 trở lên được bắn về Zalo (Zalo Bot API) và Telegram (Bot API), kênh nào có token thì bật kênh đó.
 
 ```
 attacker ──HTTP──> waf (Caddy+Coraza :8080) ──> backend (httpbin)
@@ -20,7 +20,7 @@ Lab chạy bằng **Docker rootless**: dockerd chạy bằng user thường, roo
 ```bash
 ./preflight.sh        # in [OK]/[WARN]/[FAIL] + lệnh sửa, lưu log preflight-<host>-<time>.log
 ```
-Nó kiểm tra: OS/kernel/RAM/disk, user có sudo, systemd --user, linger, subuid/subgid, user namespace, AppArmor (Ubuntu 23.10+ chặn userns), `/dev/net/tun`, cgroup, các tool (`uidmap`, `slirp4netns`, `acl`, `rsyslog`...), Docker rootful có đang chạy không, `vm.max_map_count`, port 1514/1515/8080/8443/9200/55000 có bị chiếm không, UFW, kết nối ra Docker Hub / proxy.golang.org / bot-api.zaloplatforms.com, NTP.
+Nó kiểm tra: OS/kernel/RAM/disk, user có sudo, systemd --user, linger, subuid/subgid, user namespace, AppArmor (Ubuntu 23.10+ chặn userns), `/dev/net/tun`, cgroup, các tool (`uidmap`, `slirp4netns`, `acl`, `rsyslog`...), Docker rootful có đang chạy không, `vm.max_map_count`, port 1514/1515/8080/8443/9200/55000 có bị chiếm không, UFW, kết nối ra Docker Hub / proxy.golang.org / bot-api.zaloplatforms.com / api.telegram.org, NTP.
 
 **Bước 2: cài.** Gửi log preflight cho tao xem trước nếu có FAIL lạ, rồi:
 ```bash
@@ -57,13 +57,32 @@ Dùng [Zalo Bot Platform](https://bot.zaloplatforms.com): API kiểu Telegram, `
 
 Tin nhắn gửi dạng text thường (không dùng `parse_mode`) cho chắc. Lỗi gửi được ghi vào `/var/ossec/logs/integrations.log` trong manager, kể cả khi Zalo trả HTTP 200 nhưng `ok:false`.
 
+## 1b. Bot Telegram
+
+Cùng kiểu API với Zalo (`POST https://api.telegram.org/bot<TOKEN>/sendMessage`, JSON `{"chat_id", "text"}`), text tối đa 4096 ký tự. `custom-telegram.py` dùng lại code của `custom-zalo.py`, nên nội dung tin hai bên giống nhau.
+
+1. Chat với [@BotFather](https://t.me/BotFather), `/newbot`, lấy token dạng `123456789:AA...`.
+2. Thêm bot vào group, gửi 1 tin trong group (vd `/start`), rồi lấy chat id (group là số âm, supergroup dạng `-100...`):
+   ```bash
+   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | python3 -m json.tool | grep -A3 '"chat"'
+   ```
+   `getUpdates` trả rỗng thì vào BotFather `/setprivacy` → Disable, rồi gửi lại tin trong group.
+3. Test gửi tay:
+   ```bash
+   curl -s -X POST -H 'Content-Type: application/json' -d '{"chat_id":"<CHAT_ID>","text":"test wazuh-lab"}' \
+        "https://api.telegram.org/bot<TOKEN>/sendMessage"
+   ```
+4. Điền `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (và `TELEGRAM_MIN_LEVEL` nếu muốn khác 7) vào `.env`, chạy `./setup.sh && docker compose up -d --force-recreate wazuh.manager`.
+
+Lưu ý: một số nhà mạng ở VN chặn Telegram. Chạy `./preflight.sh` hoặc `curl -m 10 https://api.telegram.org/` trên server trước; bị chặn thì integration chỉ ghi lỗi vào `integrations.log`, Zalo vẫn chạy bình thường.
+
 ## 2. Setup + chạy
 
 ```bash
 cd wazuh-lab
 ./setup.sh                 # lần đầu: tạo .env với secret random (openssl rand -hex 16), cert, hash password
-nano .env                  # điền ZALO_BOT_TOKEN (ZALO_CHAT_ID đã điền sẵn)
-./setup.sh                 # chạy lại để render token vào ossec.conf của manager
+nano .env                  # điền ZALO_BOT_TOKEN (ZALO_CHAT_ID đã điền sẵn), TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID nếu dùng
+./setup.sh                 # chạy lại để render config manager + ghi token ra secrets/
 docker compose up -d --build
 docker compose ps          # đợi ~1-2 phút cho indexer + manager lên
 ```
@@ -174,7 +193,7 @@ Quy ước cho người thêm rule:
 
 | Sửa gì | Làm gì |
 |---|---|
-| `local_rules.xml`, `local_decoder.xml`, `custom-zalo.py`, `.tpl`, `.env` (Zalo) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
+| `local_rules.xml`, `local_decoder.xml`, `custom-{zalo,telegram}.py`, `.tpl`, `.env` (Zalo/Telegram) | `./setup.sh && docker compose up -d --force-recreate wazuh.manager` |
 | `waf/Caddyfile` | `docker compose restart waf` (file được mount, không cần build lại) |
 | `WAF_MODE=On` (chặn thật) / `WAF_UPSTREAM` | sửa `.env` rồi `docker compose up -d waf` |
 | Password trong `.env` sau khi đã chạy | Phải `docker compose down -v`, xóa `config/wazuh_indexer/internal_users.yml`, chạy lại `./setup.sh`. Indexer chỉ đọc `internal_users.yml` lần khởi tạo đầu tiên. |
@@ -186,7 +205,7 @@ Lưu ý: dùng `--force-recreate` chứ đừng chỉ `restart` manager, lúc te
 ## 6. Mấy điểm cần biết
 
 - **SecAuditLogRelevantStatus** dùng regex Go (RE2), không có lookahead `(?!...)` như ModSecurity. Đã viết lại thành `^(?:5|40[0-35-9]|4[1-9])` (4xx trừ 404, và 5xx).
-- **Token bot Zalo không nằm trong `ossec.conf`**: user có quyền `manager:read` trên Wazuh API (kể cả role `readonly`) đọc được toàn bộ `ossec.conf` qua dashboard. `setup.sh` ghi token ra `secrets/zalo.token` (thư mục 700, có trong `.gitignore`), compose mount vào `/run/secrets/zalo_token`, `custom-zalo.py` tự ghép URL. Nhớ chạy `./setup.sh` trước khi `docker compose up`, thiếu file này docker sẽ tạo thư mục rỗng thay vào.
+- **Token bot Zalo/Telegram không nằm trong `ossec.conf`**: user có quyền `manager:read` trên Wazuh API (kể cả role `readonly`) đọc được toàn bộ `ossec.conf` qua dashboard. `setup.sh` ghi token ra `secrets/zalo.token`, `secrets/telegram.token` (thư mục 700, có trong `.gitignore`), compose mount vào `/run/secrets/`, script integration tự ghép URL. Nhớ chạy `./setup.sh` trước khi `docker compose up`, thiếu file này docker sẽ tạo thư mục rỗng thay vào.
 - **TLS khi gửi Zalo**: Python trong image Wazuh báo `CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain` khi gọi bot-api.zaloplatforms.com (gặp trên server aidt01), dù curl trên host chạy bình thường. Vì vậy compose mount trust store của host (`HOST_CA_BUNDLE`, mặc định `/etc/ssl/certs/ca-certificates.crt`) vào manager, và integration dùng nó làm cafile. Vẫn verify cert, không tắt kiểm tra.
 - **Agent giữ `client.keys` trong volume `wazuh_agent_etc`**: nếu không, mỗi lần recreate agent sẽ enroll lại với cùng tên `lab-host`, manager báo `Duplicate agent name` và agent nằm Disconnected (gặp trên aidt01). Lỡ bị rồi thì xóa agent cũ: `docker compose exec wazuh.manager /var/ossec/bin/manage_agents -r 001` rồi recreate agent.
 - **Audit log quá lớn**: Wazuh cắt event > 64KB, JSON bị cắt sẽ không decode được. Request body to (upload file) có thể rơi vào trường hợp này.
@@ -217,5 +236,5 @@ wazuh-lab/
         ├── wazuh_manager.conf.tpl             (auth dùng password, block integration Zalo)
         ├── rules/local_rules.xml
         ├── decoders/local_decoder.xml         (decoder Sysmon for Linux)
-        └── integrations/custom-zalo{,.py}
+        └── integrations/custom-{zalo,telegram}{,.py}
 ```

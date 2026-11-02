@@ -25,6 +25,11 @@ ZALO_BOT_TOKEN=
 ZALO_CHAT_ID=zgr-8a45b1cc3fa3d6fd8fb2
 ZALO_MIN_LEVEL=7
 
+# --- Telegram Bot (dien token + chat id roi chay lai ./setup.sh) ---
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_MIN_LEVEL=7
+
 # --- WAF ---
 WAF_MODE=DetectionOnly
 WAF_HTTP_PORT=8080
@@ -47,10 +52,16 @@ if ! grep -q '^ZALO_CHAT_ID=' .env; then
   printf '\n# --- Zalo Bot (dien token roi chay lai ./setup.sh) ---\nZALO_BOT_TOKEN=\nZALO_CHAT_ID=zgr-8a45b1cc3fa3d6fd8fb2\nZALO_MIN_LEVEL=7\n' >> .env
 fi
 
+if ! grep -q '^TELEGRAM_CHAT_ID=' .env; then
+  echo "[+] Them bien Telegram vao .env"
+  printf '\n# --- Telegram Bot (dien token + chat id roi chay lai ./setup.sh) ---\nTELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nTELEGRAM_MIN_LEVEL=7\n' >> .env
+fi
+
 set -a; . ./.env; set +a
 # Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
 # lo dan ca "bot" vao .env thi bo di de URL khong thanh "botbot..."
 ZALO_BOT_TOKEN="${ZALO_BOT_TOKEN#bot}"
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN#bot}"
 
 # 2. Cert TLS cho indexer/manager/dashboard (tu ky bang openssl, DN khop voi wazuh.indexer.yml)
 CERT_DIR=config/wazuh_indexer_ssl_certs
@@ -105,26 +116,33 @@ YML
 fi
 
 # 4. ossec.conf manager + mat khau enrollment
+# Kenh nao chua co token/chat id thi bo han khoi <integration> cua kenh do (giua BEGIN/END)
+STRIP_INT=()
 if [ -z "${ZALO_BOT_TOKEN:-}" ] || [ -z "${ZALO_CHAT_ID:-}" ]; then
   echo "[!] Chua co ZALO_BOT_TOKEN / ZALO_CHAT_ID trong .env: alert se khong ve Zalo"
+  STRIP_INT+=(-e '/<!-- BEGIN zalo/,/<!-- END zalo -->/d')
 fi
-# Chua co token thi bo han khoi <integration> de manager khong goi Zalo voi URL rong
-STRIP_INT=()
-[ -z "${ZALO_BOT_TOKEN:-}" ] || [ -z "${ZALO_CHAT_ID:-}" ] && STRIP_INT=(-e '/<integration>/,/<\/integration>/d')
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+  echo "[!] Chua co TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID trong .env: alert se khong ve Telegram"
+  STRIP_INT+=(-e '/<!-- BEGIN telegram/,/<!-- END telegram -->/d')
+fi
 sed "${STRIP_INT[@]}" \
     -e "s|__ZALO_CHAT_ID__|${ZALO_CHAT_ID:-}|" \
     -e "s|__ZALO_MIN_LEVEL__|${ZALO_MIN_LEVEL:-7}|" \
+    -e "s|__TELEGRAM_CHAT_ID__|${TELEGRAM_CHAT_ID:-}|" \
+    -e "s|__TELEGRAM_MIN_LEVEL__|${TELEGRAM_MIN_LEVEL:-7}|" \
     -e "s|__CLUSTER_KEY__|${CLUSTER_KEY}|" \
     config/wazuh_cluster/wazuh_manager.conf.tpl > config/wazuh_cluster/wazuh_manager.conf
 printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
-# Token Zalo de file rieng, compose mount vao /run/secrets/zalo_token. Thu muc secrets 700 chan
+# Token bot de file rieng, compose mount vao /run/secrets/{zalo,telegram}_token. Thu muc secrets 700 chan
 # user khac tren host; file 644 de user wazuh trong container (uid khac) doc duoc.
 install -d -m 700 secrets
 printf '%s' "${ZALO_BOT_TOKEN:-}" > secrets/zalo.token
-chmod 644 secrets/zalo.token
+printf '%s' "${TELEGRAM_BOT_TOKEN:-}" > secrets/telegram.token
+chmod 644 secrets/zalo.token secrets/telegram.token
 chmod 600 config/wazuh_cluster/wazuh_manager.conf config/wazuh_cluster/authd.pass
 # integratord chay bang user wazuh, file mount vao la root:root nen phai cho other doc+chay
-chmod 755 config/wazuh_cluster/integrations/custom-zalo config/wazuh_cluster/integrations/custom-zalo.py
+chmod 755 config/wazuh_cluster/integrations/custom-{zalo,telegram}{,.py}
 
 if [ ! -r "$AUTH_LOG_DIR/auth.log" ]; then
   echo "[!] Khong doc duoc $AUTH_LOG_DIR/auth.log. Rootless: chay ./install-rootless.sh. Rootful: dat AUTH_LOG_DIR=/var/log va cai rsyslog"

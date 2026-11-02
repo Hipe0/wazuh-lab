@@ -8,7 +8,7 @@ LOG="preflight-$(hostname)-$(date +%Y%m%d-%H%M).log"
 exec > >(tee "$LOG") 2>&1
 
 PORTS=(1514 1515 8080 8443 9200 55000)
-HOSTS=(download.docker.com registry-1.docker.io production.cloudflare.docker.com proxy.golang.org bot-api.zaloplatforms.com)
+HOSTS=(download.docker.com registry-1.docker.io production.cloudflare.docker.com proxy.golang.org bot-api.zaloplatforms.com api.telegram.org)
 NEED_RAM_MB=6000
 NEED_DISK_GB=20
 
