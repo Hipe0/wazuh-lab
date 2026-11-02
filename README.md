@@ -80,6 +80,8 @@ TELEGRAM_TOPICS="Reconnaissance=2,Initial Access=3,Execution=4,Persistence=5,Pri
 ```
 Alert vào topic theo `rule.mitre.tactic` (technique thuộc nhiều tactic thì lấy tactic đầu tiên có topic). Không có MITRE hoặc tactic không có trong bảng (vd Command and Control) thì vào General.
 
+Kiểm tra cả group: `./check-telegram.sh` (bot còn trong group không, gửi 1 tin test vào General và từng topic, in OK hoặc lỗi của từng topic).
+
 Lưu ý: một số nhà mạng ở VN chặn Telegram. Chạy `./preflight.sh` hoặc `curl -m 10 https://api.telegram.org/` trên server trước; bị chặn thì integration chỉ ghi lỗi vào `integrations.log`, Zalo vẫn chạy bình thường.
 
 ## 2. Setup + chạy
@@ -231,6 +233,7 @@ wazuh-lab/
 ├── setup.sh               # .env, cert, hash password, render config
 ├── enable-sysmon.sh       # rsyslog tách log Sysmon for Linux cho agent (sudo)
 ├── sysmon/sysmon-config.xml  # config Sysmon for Linux đã lọc rác
+├── check-telegram.sh     # gửi tin test vào group/topic Telegram
 ├── add-rule-user.sh       # tạo tài khoản dashboard chỉ được thêm/sửa rule
 ├── scripts/add_rule_user.py
 ├── waf/{Dockerfile,Caddyfile}
