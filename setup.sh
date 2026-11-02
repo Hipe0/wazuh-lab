@@ -29,6 +29,9 @@ ZALO_MIN_LEVEL=7
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 TELEGRAM_MIN_LEVEL=7
+# Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3".
+# De trong thi gui het vao General
+TELEGRAM_TOPICS=
 
 # --- WAF ---
 WAF_MODE=DetectionOnly
@@ -56,6 +59,7 @@ if ! grep -q '^TELEGRAM_CHAT_ID=' .env; then
   echo "[+] Them bien Telegram vao .env"
   printf '\n# --- Telegram Bot (dien token + chat id roi chay lai ./setup.sh) ---\nTELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nTELEGRAM_MIN_LEVEL=7\n' >> .env
 fi
+grep -q '^TELEGRAM_TOPICS=' .env || printf '# Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3"\nTELEGRAM_TOPICS=\n' >> .env
 
 set -a; . ./.env; set +a
 # Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
@@ -139,7 +143,12 @@ printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
 install -d -m 700 secrets
 printf '%s' "${ZALO_BOT_TOKEN:-}" > secrets/zalo.token
 printf '%s' "${TELEGRAM_BOT_TOKEN:-}" > secrets/telegram.token
-chmod 644 secrets/zalo.token secrets/telegram.token
+# "Initial Access=3,Execution=4" -> {"Initial Access": 3, "Execution": 4}
+TELEGRAM_TOPICS="${TELEGRAM_TOPICS:-}" python3 -c '
+import json, os
+pairs = [p.split("=", 1) for p in os.environ["TELEGRAM_TOPICS"].split(",") if "=" in p]
+print(json.dumps({k.strip(): int(v) for k, v in pairs}))' > secrets/telegram_topics.json
+chmod 644 secrets/zalo.token secrets/telegram.token secrets/telegram_topics.json
 chmod 600 config/wazuh_cluster/wazuh_manager.conf config/wazuh_cluster/authd.pass
 # integratord chay bang user wazuh, file mount vao la root:root nen phai cho other doc+chay
 chmod 755 config/wazuh_cluster/integrations/custom-{zalo,telegram}{,.py}

@@ -99,7 +99,8 @@ def build_message(alert, max_text=MAX_TEXT):
     return text if len(text) <= max_text else text[: max_text - 3] + "..."
 
 
-def main(service="Zalo", token_file=TOKEN_FILE, max_text=MAX_TEXT):
+def main(service="Zalo", token_file=TOKEN_FILE, max_text=MAX_TEXT, extra=None):
+    """extra(alert) -> dict: field them vao body sendMessage (Telegram dung cho message_thread_id)."""
     global LOG_NAME
     LOG_NAME = f"custom-{service.lower()}"
     if len(sys.argv) < 4:
@@ -109,7 +110,10 @@ def main(service="Zalo", token_file=TOKEN_FILE, max_text=MAX_TEXT):
     with open(alert_file) as f:
         alert = json.load(f)
 
-    body = json.dumps({"chat_id": chat_id, "text": build_message(alert, max_text)}).encode()
+    payload = {"chat_id": chat_id, "text": build_message(alert, max_text)}
+    if extra:
+        payload.update(extra(alert))
+    body = json.dumps(payload).encode()
     url = hook_url
     # hook_url cu co san /bot<token>/sendMessage thi dung nguyen
     if "/sendMessage" not in hook_url and os.path.isfile(token_file):

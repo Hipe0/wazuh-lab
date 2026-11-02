@@ -74,6 +74,12 @@ Cùng kiểu API với Zalo (`POST https://api.telegram.org/bot<TOKEN>/sendMessa
    ```
 4. Điền `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (và `TELEGRAM_MIN_LEVEL` nếu muốn khác 7) vào `.env`, chạy `./setup.sh && docker compose up -d --force-recreate wazuh.manager`.
 
+**Group bật Topics** (chia topic theo tactic MITRE): vẫn 1 bot, 1 chat id; mỗi topic có `message_thread_id`. Gửi `/start` trong từng topic rồi lấy id bằng `getUpdates` (trường `message_thread_id`, tên topic ở `reply_to_message.forum_topic_created.name`). Điền vào `.env`:
+```
+TELEGRAM_TOPICS="Reconnaissance=2,Initial Access=3,Execution=4,Persistence=5,Privilege Escalation=6,Credential Access=7"
+```
+Alert vào topic theo `rule.mitre.tactic` (technique thuộc nhiều tactic thì lấy tactic đầu tiên có topic). Không có MITRE hoặc tactic không có trong bảng (vd Command and Control) thì vào General.
+
 Lưu ý: một số nhà mạng ở VN chặn Telegram. Chạy `./preflight.sh` hoặc `curl -m 10 https://api.telegram.org/` trên server trước; bị chặn thì integration chỉ ghi lỗi vào `integrations.log`, Zalo vẫn chạy bình thường.
 
 ## 2. Setup + chạy

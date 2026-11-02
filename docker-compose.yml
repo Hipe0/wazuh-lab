@@ -51,6 +51,7 @@ services:
       # Token bot Zalo/Telegram (setup.sh tao). Chay ./setup.sh truoc, thieu file thi docker tao thu muc rong
       - ./secrets/zalo.token:/run/secrets/zalo_token:ro
       - ./secrets/telegram.token:/run/secrets/telegram_token:ro
+      - ./secrets/telegram_topics.json:/run/secrets/telegram_topics.json:ro
       # Trust store cua host cho integration Zalo (can khi mang chen CA rieng de soi SSL)
       - ${HOST_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/host-ca-bundle.crt:ro
 
