@@ -136,4 +136,16 @@
     <group>attack,</group>
   </rule>
 
+  <!-- Whitelist: dpkg (apt upgrade / unattended-upgrades deu goi dpkg) giai nen file config moi
+       ra *.dpkg-new / *.dpkg-tmp roi rename, hoac giu ban cu *.dpkg-old / *.dpkg-dist.
+       Vd FP 05/11/2026: apt 2.8.3 -> 2.8.4 tao /etc/cron.daily/apt-compat.dpkg-new.
+       Chi bo qua khi CA image la dpkg VA ten file co duoi dpkg, nen attacker tu tao file cron
+       bang tay van bi bat. Con lai: cai .deb doc hai bang dpkg -i se khong bi rule nay bat. -->
+  <rule id="100331" level="0">
+    <if_sid>100330</if_sid>
+    <field name="sysmon.image" type="pcre2">^/(usr/)?bin/dpkg$</field>
+    <field name="sysmon.targetfilename" type="pcre2">\.dpkg-(new|tmp|old|dist)$</field>
+    <description>Sysmon Linux: dpkg tao $(sysmon.targetfilename) khi cai/nang cap package (whitelist 100330)</description>
+  </rule>
+
 </group>

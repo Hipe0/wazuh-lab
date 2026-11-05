@@ -165,6 +165,7 @@ Wazuh chỉ có sẵn decoder cho Sysmon trên Windows (eventchannel), nên lab 
 | 100313 | 8 | Chạy `useradd`/`usermod`/`passwd`... (T1136.001) |
 | 100320 | 10 | Kết nối ra port hay dùng cho C2/reverse shell: 4444, 4445, 1337, 31337, 5555, 6666, 9001 (T1571) |
 | 100330 | 10 | Tạo file trong cron, systemd, `authorized_keys`, `sudoers.d` (T1053.003) |
+| 100331 | 0 | Whitelist 100330: `dpkg` tạo `*.dpkg-new/-tmp/-old/-dist` khi `apt upgrade` (không alert) |
 
 Test vô hại (không kết nối đi đâu, chỉ có chuỗi trong commandline): `bash -c 'true /dev/tcp/203.0.113.9/4444'` → rule 100310 về Zalo.
 
