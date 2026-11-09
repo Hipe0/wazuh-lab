@@ -115,6 +115,8 @@ services:
       # Mount thu muc, khong mount file: logrotate doi inode, mount file se ket o file cu
       - ${AUTH_LOG_DIR}:/var/log/host:ro
       - coraza_logs:/var/log/coraza:ro
+      # Suricata: eve.json quyen 644, mount thang thu muc (logrotate doi inode)
+      - ${SURICATA_LOG_DIR:-/var/log/suricata}:/var/log/suricata:ro
     depends_on:
       - wazuh.manager
 

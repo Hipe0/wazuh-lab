@@ -136,4 +136,20 @@
     <group>attack,</group>
   </rule>
 
+  <!-- Suricata: Wazuh co san 86600 (moi event, level 0) va 86601 (event_type alert, level 3).
+       Chi nang level alert ma Suricata xep nang (severity 1-2) de ve Zalo/Telegram, severity 3+ giu level 3. -->
+  <rule id="100340" level="12">
+    <if_sid>86601</if_sid>
+    <field name="alert.severity" type="pcre2">^1$</field>
+    <description>Suricata: $(alert.signature) ($(src_ip) -> $(dest_ip):$(dest_port))</description>
+    <group>suricata_high,attack,</group>
+  </rule>
+
+  <rule id="100341" level="10">
+    <if_sid>86601</if_sid>
+    <field name="alert.severity" type="pcre2">^2$</field>
+    <description>Suricata: $(alert.signature) ($(src_ip) -> $(dest_ip):$(dest_port))</description>
+    <group>suricata_high,attack,</group>
+  </rule>
+
 </group>
