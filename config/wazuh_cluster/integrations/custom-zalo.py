@@ -59,6 +59,26 @@ def coraza_matches(full_log, limit=4):
     return out[:limit]
 
 
+def suricata_lines(d):
+    a = d.get("alert") or {}
+    out = [
+        f"Signature: {a.get('signature', '?')} (sid {a.get('signature_id', '?')})",
+        f"Category: {a.get('category', '-')} | severity {a.get('severity', '-')}",
+        f"Flow: {d.get('src_ip', '?')}:{d.get('src_port', '-')} -> {d.get('dest_ip', '?')}:{d.get('dest_port', '-')}"
+        f" {d.get('proto', '')}/{d.get('app_proto', '-')} ({d.get('in_iface', '-')})",
+    ]
+    http = d.get("http") or {}
+    if http.get("hostname") or http.get("url"):
+        out.append(f"HTTP: {http.get('http_method', '')} {http.get('hostname', '')}{str(http.get('url', ''))[:300]}")
+    sni = get(d, "tls.sni")
+    if sni:
+        out.append(f"TLS SNI: {sni}")
+    q = get(d, "dns.rrname") or get(d, "dns.query.0.rrname")
+    if q:
+        out.append(f"DNS: {q}")
+    return out
+
+
 def build_message(alert, max_text=MAX_TEXT):
     # Gui text thuong (khong parse_mode) cho chac, khoi lo escape HTML/Markdown
     rule = alert.get("rule", {})
@@ -70,7 +90,7 @@ def build_message(alert, max_text=MAX_TEXT):
         f"Agent: {get(alert, 'agent.name', '?')} ({get(alert, 'agent.ip', '-')})",
         f"Time: {alert.get('timestamp', '')}",
     ]
-    srcip = get(alert, "data.srcip") or get(alert, "data.transaction.client_ip")
+    srcip = get(alert, "data.srcip") or get(alert, "data.transaction.client_ip") or get(alert, "data.src_ip")
     if srcip:
         lines.append(f"Src IP: {srcip}")
     user = get(alert, "data.dstuser") or get(alert, "data.srcuser")
@@ -90,6 +110,9 @@ def build_message(alert, max_text=MAX_TEXT):
         for key, label in SYSMON_FIELDS:
             if sysmon.get(key) not in (None, "", "-"):
                 lines.append(f"{label}: {str(sysmon[key])[:300]}")
+    elif isinstance(get(alert, "data.alert"), dict) and get(alert, "data.event_type") == "alert":
+        # Suricata eve.json: JSON dai (metadata, flow...), cat 500 ky tu bi dut giua chung, in field da decode
+        lines.extend(suricata_lines(alert["data"]))
     elif full_log and get(alert, "data.transaction"):
         for rid, msg, data in coraza_matches(full_log):
             lines.append(f"- CRS {rid}: {msg}\n  {data[:200]}")

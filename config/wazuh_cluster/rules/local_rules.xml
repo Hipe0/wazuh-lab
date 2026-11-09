@@ -136,6 +136,10 @@
     <group>attack,</group>
   </rule>
 
+</group>
+
+<!-- Group rieng: rule.groups co ids,suricata (giong rule goc 86601), khong ke thua sysmon -->
+<group name="ids,suricata,">
   <!-- Suricata: Wazuh co san 86600 (moi event, level 0) va 86601 (event_type alert, level 3).
        Chi nang level alert ma Suricata xep nang (severity 1-2) de ve Zalo/Telegram, severity 3+ giu level 3. -->
   <rule id="100340" level="12">
