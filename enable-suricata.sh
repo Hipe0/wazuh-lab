@@ -34,8 +34,9 @@ for _ in $(seq 1 90); do
 done
 systemctl is-active --quiet suricata || die "Suricata khong len lai: sudo journalctl -u suricata -n 30"
 
-echo "[+] Ban alert test (testmynids.org, rule 2100498)"
-curl -s -o /dev/null --max-time 10 http://testmynids.org/uid/index.html || true
+echo "[+] Ban alert test (rule 2100498: goi tin chua 'uid=0(root)' di qua card mang)"
+# testmynids.org da bi bo (chi con trang ban ten mien), tu nhet chuoi vao request ra ngoai
+curl -s -o /dev/null --max-time 10 "http://example.com/?q=uid=0(root)" || true
 sleep 5
 if grep -q '2100498' "$LOG_DIR/fast.log" 2>/dev/null; then
   echo "    OK: $(grep '2100498' "$LOG_DIR/fast.log" | tail -1 | cut -c1-160)"

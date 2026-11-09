@@ -201,7 +201,7 @@ Quy ước cho người thêm rule:
 
 Suricata trên aidt01 cài bằng apt, chạy bằng root (`suricata.service`, `--af-packet` trên card mạng). `eve.json` mặc định quyền 644, thư mục 755, nên agent rootless đọc thẳng được: compose mount `/var/log/suricata` (read-only) vào agent, agent đọc `eve.json` dạng `json`. Không cần rsyslog như Sysmon. Đổi thư mục bằng `SURICATA_LOG_DIR` trong `.env`.
 
-Suricata cài từ apt **không kèm rule**: `rules/` trống thì chỉ ghi flow/dns/http, không bao giờ có `event_type: alert`. `enable-suricata.sh` chạy `suricata-update` (tải ET Open), kiểm tra config, restart Suricata và bắn 1 alert test (testmynids.org, rule 2100498):
+Suricata cài từ apt **không kèm rule**: `rules/` trống thì chỉ ghi flow/dns/http, không bao giờ có `event_type: alert`. `enable-suricata.sh` chạy `suricata-update` (tải ET Open), kiểm tra config, restart Suricata và bắn 1 alert test (request ra ngoài có chuỗi `uid=0(root)`, rule 2100498; testmynids.org đã chết):
 
 ```bash
 ./enable-suricata.sh
