@@ -156,4 +156,15 @@
     <group>suricata_high,attack,</group>
   </rule>
 
+  <!-- Rule danh tieng IP (IP nam trong blocklist: Spamhaus DROP, DShield, CINS, ET COMPROMISED, Tor...):
+       ban moi khi IP nguon co trong danh sach, khong xem noi dung goi. Internet quet port lien tuc nen
+       moi ngay hang tram alert, phan lon la 1 goi SYN khong ai tra loi. Ha ve level 3: van luu, van tim
+       duoc tren dashboard (rule.groups: suricata_reputation), khong gui Zalo/Telegram. -->
+  <rule id="100342" level="3">
+    <if_sid>100340, 100341</if_sid>
+    <field name="alert.signature" type="pcre2">^ET (DROP|CINS|COMPROMISED|DSHIELD|TOR|3CORESec)\b</field>
+    <description>Suricata (reputation): $(alert.signature) ($(src_ip) -> $(dest_ip):$(dest_port))</description>
+    <group>suricata_reputation,</group>
+  </rule>
+
 </group>
