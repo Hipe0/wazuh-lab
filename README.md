@@ -197,6 +197,28 @@ Quy ước cho người thêm rule:
 - Dùng rule ID 100400–100999 (100200–100399 lab đang dùng).
 - Rule lỗi cú pháp thì manager không lên lại được: dashboard có kiểm tra config trước khi restart, nhưng vẫn nên test bằng **Ruleset test** trước.
 
+## 4d. Suricata (`enable-suricata.sh`)
+
+Suricata trên aidt01 cài bằng apt, chạy bằng root (`suricata.service`, `--af-packet` trên card mạng). `eve.json` mặc định quyền 644, thư mục 755, nên agent rootless đọc thẳng được: compose mount `/var/log/suricata` (read-only) vào agent, agent đọc `eve.json` dạng `json`. Không cần rsyslog như Sysmon. Đổi thư mục bằng `SURICATA_LOG_DIR` trong `.env`.
+
+Suricata cài từ apt **không kèm rule**: `rules/` trống thì chỉ ghi flow/dns/http, không bao giờ có `event_type: alert`. `enable-suricata.sh` chạy `suricata-update` (tải ET Open), kiểm tra config, restart Suricata và bắn 1 alert test (testmynids.org, rule 2100498):
+
+```bash
+./enable-suricata.sh
+docker compose up -d --force-recreate wazuh.manager wazuh.agent
+```
+
+Wazuh có sẵn decoder JSON và rule Suricata: 86600 (mọi event, level 0), 86601 (alert, level 3). Level 3 không về Zalo/Telegram, nên lab thêm:
+
+| Rule | Level | Khi nào |
+|---|---|---|
+| 100340 | 12 | Alert Suricata `severity` 1 |
+| 100341 | 10 | Alert Suricata `severity` 2 |
+
+Severity 3+ vẫn chỉ hiện trên dashboard (lọc `rule.groups: suricata`). Rule Suricata không có MITRE nên vào topic General bên Telegram. Agent chỉ đọc dòng mới từ lúc start, không gửi lại cả file `eve.json` cũ.
+
+Giới hạn: Suricata không đọc được nội dung HTTPS (chỉ thấy SNI/JA3), traffic qua tunnel cloudflared và giữa các container trên bridge Docker không đi qua card mạng nên nó gần như không thấy request vào app web. Tấn công web vẫn là việc của WAF. Rule không tự cập nhật: `sudo suricata-update && sudo systemctl reload suricata`.
+
 ## 5. Đổi cấu hình
 
 | Sửa gì | Làm gì |
@@ -232,6 +254,7 @@ wazuh-lab/
 ├── docker-compose.yml
 ├── setup.sh               # .env, cert, hash password, render config
 ├── enable-sysmon.sh       # rsyslog tách log Sysmon for Linux cho agent (sudo)
+├── enable-suricata.sh     # tải rule ET Open cho Suricata, restart, bắn alert test (sudo)
 ├── sysmon/sysmon-config.xml  # config Sysmon for Linux đã lọc rác
 ├── check-telegram.sh     # gửi tin test vào group/topic Telegram
 ├── add-rule-user.sh       # tạo tài khoản dashboard chỉ được thêm/sửa rule
@@ -240,7 +263,7 @@ wazuh-lab/
 └── config/
     ├── wazuh_indexer/wazuh.indexer.yml        (internal_users.yml do setup.sh sinh)
     ├── wazuh_dashboard/opensearch_dashboards.yml
-    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log + sysmon.log)
+    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log + sysmon.log + suricata eve.json)
     └── wazuh_cluster/
         ├── wazuh_manager.conf.tpl             (auth dùng password, block integration Zalo)
         ├── rules/local_rules.xml
