@@ -157,3 +157,23 @@
   </rule>
 
 </group>
+
+<!-- NIDS ML (do an): to hop IF + LOF + OCSVM cham diem flow Argus, nids-collector ghi /var/log/nids/alerts.jsonl.
+     Chi noi vao Wazuh SAU khi hieu chinh nguong tren traffic benign cua lab, khong thi bao nham nhieu. -->
+<group name="nids,dacn_ml,">
+  <rule id="100500" level="8">
+    <decoded_as>json</decoded_as>
+    <field name="nids">^dacn-ml$</field>
+    <description>NIDS ML: flow bat thuong $(src_ip) -> $(dst_ip):$(dst_port)/$(proto), diem $(score) (nguong $(threshold))</description>
+    <group>anomaly,</group>
+  </rule>
+
+  <!-- Nhieu flow bat thuong tu cung 1 nguon trong 60s: nghi bruteforce / quet / DoS -->
+  <rule id="100501" level="12" frequency="20" timeframe="60">
+    <if_matched_sid>100500</if_matched_sid>
+    <same_field>src_ip</same_field>
+    <description>NIDS ML: tu 20 flow bat thuong trong 60s tu $(src_ip) (nghi bruteforce/quet/DoS)</description>
+    <group>anomaly,attack,</group>
+  </rule>
+
+</group>

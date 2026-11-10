@@ -219,6 +219,25 @@ Severity 3+ vẫn chỉ hiện trên dashboard (lọc `rule.groups: suricata`). 
 
 Giới hạn: Suricata không đọc được nội dung HTTPS (chỉ thấy SNI/JA3), traffic qua tunnel cloudflared và giữa các container trên bridge Docker không đi qua card mạng nên nó gần như không thấy request vào app web. Tấn công web vẫn là việc của WAF. Rule không tự cập nhật: `sudo suricata-update && sudo systemctl reload suricata`.
 
+
+## 4e. NIDS ML của đồ án (rule 100500, 100501)
+
+Model phát hiện bất thường (Isolation Forest + LOF + One-Class SVM) chạy ở stack riêng `~/nids-server` (container `nids-collector`, không nằm trong repo này). Sensor ở máy khác gửi flow Argus qua syslog UDP 10514 về `/var/log/argus-flows/flows.log`, collector chấm điểm và ghi mỗi flow vượt ngưỡng thành 1 dòng JSON vào `/var/log/nids/alerts.jsonl`. Compose mount `/var/log/nids` (read-only) vào agent, agent đọc file dạng `json`. Đổi thư mục bằng `NIDS_LOG_DIR` trong `.env`.
+
+Thư mục phải có sẵn **trước khi** `docker compose up`, không thì Docker rootless không tạo được và agent không lên:
+
+```bash
+sudo mkdir -p /var/log/nids && sudo chown "$USER": /var/log/nids
+docker compose up -d --force-recreate wazuh.manager wazuh.agent
+```
+
+| Rule | Level | Khi nào |
+|---|---|---|
+| 100500 | 8 | Mỗi flow vượt ngưỡng (`nids: dacn-ml`) |
+| 100501 | 12 | Từ 20 flow bất thường cùng `src_ip` trong 60 giây |
+
+Chỉ nối vào Wazuh **sau khi** hiệu chỉnh ngưỡng bằng traffic bình thường của lab: ngưỡng gốc chọn trên HIKARI-2021, traffic sạch của mạng khác vẫn vượt ngưỡng và 100501 sẽ bắn về Zalo/Telegram. Rule không có MITRE nên vào topic General. Kiểm rule bằng `docker compose exec wazuh.manager /var/ossec/bin/wazuh-logtest`, dán 1 dòng của `alerts.jsonl`.
+
 ## 5. Đổi cấu hình
 
 | Sửa gì | Làm gì |
@@ -263,7 +282,7 @@ wazuh-lab/
 └── config/
     ├── wazuh_indexer/wazuh.indexer.yml        (internal_users.yml do setup.sh sinh)
     ├── wazuh_dashboard/opensearch_dashboards.yml
-    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log + sysmon.log + suricata eve.json)
+    ├── wazuh_agent/ossec.conf                 (localfile auth.log + coraza audit.log + sysmon.log + suricata eve.json + nids alerts.jsonl)
     └── wazuh_cluster/
         ├── wazuh_manager.conf.tpl             (auth dùng password, block integration Zalo)
         ├── rules/local_rules.xml
