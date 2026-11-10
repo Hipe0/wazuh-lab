@@ -214,6 +214,7 @@ Wazuh có sẵn decoder JSON và rule Suricata: 86600 (mọi event, level 0), 86
 |---|---|---|
 | 100340 | 12 | Alert Suricata `severity` 1 |
 | 100341 | 10 | Alert Suricata `severity` 2 |
+| 100342 | 3 | Alert Suricata sev2 thuộc nhóm IP reputation (ET DROP Spamhaus/Dshield, ET CINS, ET COMPROMISED): vẫn lưu indexer, không gửi bot |
 
 Severity 3+ vẫn chỉ hiện trên dashboard (lọc `rule.groups: suricata`). Rule Suricata không có MITRE nên vào topic General bên Telegram. Agent chỉ đọc dòng mới từ lúc start, không gửi lại cả file `eve.json` cũ, và chỉ gửi dòng `event_type` alert/anomaly (`<restrict>` trong localfile): flow/dns/stats khoảng 600MB/ngày làm đầy buffer agent (rule 202/203) mà không sinh alert nào. Buffer agent tăng lên 50000 event, 1000 eps.
 
