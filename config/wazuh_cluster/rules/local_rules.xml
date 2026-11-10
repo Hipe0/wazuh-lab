@@ -156,4 +156,16 @@
     <group>suricata_high,attack,</group>
   </rule>
 
+  <!-- Signature IP reputation/blocklist (ET DROP Spamhaus/Dshield, ET CINS, ET COMPROMISED): chi bao
+       "IP nguon nam trong blocklist", khong noi gi ve payload. Server public nen IP ngoai internet quet vao
+       lien tuc -> spam bot. Ha xuong level 3 (duoi nguong Zalo/Telegram = 7) nhung van ghi alert vao
+       indexer de tra cuu (rule.id:100342). Ket noi tu cac IP nay ma co payload tan cong that
+       thi signature khac (sev1/sev2) van ban qua 100340/100341. -->
+  <rule id="100342" level="3">
+    <if_sid>100341</if_sid>
+    <field name="alert.signature" type="pcre2">^ET (DROP Spamhaus|DROP Dshield|CINS Active Threat Intelligence|COMPROMISED Known Compromised)</field>
+    <description>Suricata (IP reputation, khong gui bot): $(alert.signature) ($(src_ip) -> $(dest_ip):$(dest_port))</description>
+    <group>suricata_reputation,</group>
+  </rule>
+
 </group>
