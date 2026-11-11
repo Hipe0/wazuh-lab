@@ -7,9 +7,13 @@
 # Group bat Topics: alert duoc gui vao topic theo tactic MITRE (rule.mitre.tactic) qua
 # message_thread_id. Bang tactic -> thread id do setup.sh ghi tu TELEGRAM_TOPICS trong .env.
 # Alert khong co tactic, hoac tactic khong co trong bang, vao topic General.
+#
+# Group thu hai (TELEGRAM2_CHAT_ID, cung bot) khong dung Topics: chi them message_thread_id khi
+# chat id (argv[2]) trung "_chat" (chat id group chinh) trong file topics.
 import importlib.util
 import json
 import os
+import sys
 
 TOPICS_FILE = "/run/secrets/telegram_topics.json"
 
@@ -22,7 +26,12 @@ _spec.loader.exec_module(zalo)
 def load_topics():
     try:
         with open(TOPICS_FILE) as f:
-            return {k.strip().lower(): int(v) for k, v in json.load(f).items()}
+            data = json.load(f)
+        main_chat = str(data.pop("_chat", "")).strip()
+        # file cu chua co "_chat" thi giu hanh vi cu (ap topic cho moi chat)
+        if main_chat and len(sys.argv) > 2 and sys.argv[2].strip() != main_chat:
+            return {}
+        return {k.strip().lower(): int(v) for k, v in data.items()}
     except (OSError, ValueError, AttributeError):
         return {}
 

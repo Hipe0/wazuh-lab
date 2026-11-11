@@ -82,17 +82,21 @@ Alert vào topic theo `rule.mitre.tactic` (technique thuộc nhiều tactic thì
 
 Kiểm tra cả group: `./check-telegram.sh` (bot còn trong group không, gửi 1 tin test vào General và từng topic, in OK hoặc lỗi của từng topic).
 
-**Group riêng cho alert model ML** (người test không vào được group chính): dùng **cùng bot, cùng token**, chỉ thêm chat id. Token thuộc về bot, không thuộc về group, một bot gửi được vào nhiều group.
+**Group Telegram thứ hai** (vd group cho người test không vào được group chính): dùng **cùng bot, cùng token**, chỉ thêm chat id. Token thuộc về bot, không thuộc về group, một bot gửi được vào nhiều group, nên không cần tạo bot mới.
 
-1. Tạo group Telegram mới, thêm bot vào, thêm người test. Gửi 1 tin bất kỳ trong group.
+1. Tạo group Telegram mới (không cần bật Topics), thêm bot vào (tìm theo `@username` của bot), thêm người test. Gửi 1 tin bất kỳ trong group.
 2. Lấy chat id (đọc token từ `secrets/`, không in token ra):
    ```bash
    python3 -c 'import json,urllib.request;t=open("secrets/telegram.token").read().strip();r=json.load(urllib.request.urlopen(f"https://api.telegram.org/bot{t}/getUpdates"));[print(c["id"],c.get("title")) for c in {json.dumps(x):x for x in (u.get(k,{}).get("chat") for u in r["result"] for k in ("message","my_chat_member")) if x}.values()]'
    ```
-   Chat id group có dạng `-100...`.
-3. Điền `TELEGRAM_ML_CHAT_ID` (và `TELEGRAM_ML_MIN_LEVEL`: 12 = chỉ rule 100501, 8 = mọi flow bất thường) vào `.env`, chạy `./setup.sh && docker compose up -d --force-recreate wazuh.manager`, rồi `./check-telegram.sh` (có thêm dòng `group ML`).
+   Chat id group có dạng `-100...` (group thường có thể là `-...`, sau khi nâng lên supergroup thì id đổi, lấy lại).
+3. Điền vào `.env`:
+   - `TELEGRAM2_CHAT_ID`: chat id ở bước 2.
+   - `TELEGRAM2_MIN_LEVEL`: mặc định 7, giống group chính.
+   - `TELEGRAM2_GROUP`: để trống = nhận mọi alert (SIEM + ML); `dacn_ml` = chỉ alert model ML (khi đó level 12 = chỉ rule 100501, 8 = mọi flow bất thường).
+4. `./setup.sh && docker compose up -d --force-recreate wazuh.manager`, rồi `./check-telegram.sh` (có thêm dòng `group 2`).
 
-Khối `<integration>` thứ hai chỉ lấy alert có group `dacn_ml`. Wazuh không loại trừ được theo group, nên alert ML đủ level vẫn về cả group chính và Zalo. Không nên để level 8 lâu: mỗi flow 1 tin, Telegram giới hạn khoảng 20 tin/phút cho 1 group, gửi dồn sẽ bị chặn (lỗi 429 trong `integrations.log`).
+Topics chỉ áp cho group chính (setup.sh ghi chat id group chính vào `secrets/telegram_topics.json` dưới khoá `_chat`), group thứ hai nhận tin thường. Không để `TELEGRAM2_GROUP=dacn_ml` với level 8 lâu: mỗi flow 1 tin, Telegram giới hạn khoảng 20 tin/phút cho 1 group, gửi dồn sẽ bị chặn (lỗi 429 trong `integrations.log`).
 
 Lưu ý: một số nhà mạng ở VN chặn Telegram. Chạy `./preflight.sh` hoặc `curl -m 10 https://api.telegram.org/` trên server trước; bị chặn thì integration chỉ ghi lỗi vào `integrations.log`, Zalo vẫn chạy bình thường.
 
