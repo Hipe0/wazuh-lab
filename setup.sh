@@ -32,6 +32,13 @@ TELEGRAM_MIN_LEVEL=7
 # Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3".
 # De trong thi gui het vao General
 TELEGRAM_TOPICS=
+# Group Telegram thu hai, CUNG bot (khong can token moi). Trong = tat.
+# TELEGRAM2_GROUP trong = moi alert >= level; "dacn_ml" = chi alert model ML (8 = moi flow, 12 = chi rule 100501)
+TELEGRAM2_CHAT_ID=
+TELEGRAM2_MIN_LEVEL=7
+TELEGRAM2_GROUP=
+# Topics cua group thu hai (bat Topics trong group), cung dang, them duoc rule group: "dacn_ml=2,Reconnaissance=3"
+TELEGRAM2_TOPICS=
 
 # --- WAF ---
 WAF_MODE=DetectionOnly
@@ -60,6 +67,11 @@ if ! grep -q '^TELEGRAM_CHAT_ID=' .env; then
   printf '\n# --- Telegram Bot (dien token + chat id roi chay lai ./setup.sh) ---\nTELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nTELEGRAM_MIN_LEVEL=7\n' >> .env
 fi
 grep -q '^TELEGRAM_TOPICS=' .env || printf '# Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3"\nTELEGRAM_TOPICS=\n' >> .env
+if ! grep -q '^TELEGRAM2_CHAT_ID=' .env; then
+  echo "[+] Them bien Telegram group thu hai vao .env"
+  printf '# Group Telegram thu hai, CUNG bot. TELEGRAM2_GROUP trong = moi alert, "dacn_ml" = chi alert model ML\nTELEGRAM2_CHAT_ID=\nTELEGRAM2_MIN_LEVEL=7\nTELEGRAM2_GROUP=\n' >> .env
+fi
+grep -q '^TELEGRAM2_TOPICS=' .env || printf '# Topics group thu hai, vd "dacn_ml=2,Reconnaissance=3" (rule group hoac tactic MITRE)\nTELEGRAM2_TOPICS=\n' >> .env
 
 set -a; . ./.env; set +a
 # Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
@@ -130,11 +142,19 @@ if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
   echo "[!] Chua co TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID trong .env: alert se khong ve Telegram"
   STRIP_INT+=(-e '/<!-- BEGIN telegram/,/<!-- END telegram -->/d')
 fi
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM2_CHAT_ID:-}" ]; then
+  STRIP_INT+=(-e '/<!-- BEGIN tg2/,/<!-- END tg2 -->/d')
+elif [ -z "${TELEGRAM2_GROUP:-}" ]; then
+  STRIP_INT+=(-e '/<group>__TELEGRAM2_GROUP__<\/group>/d')
+fi
 sed "${STRIP_INT[@]}" \
     -e "s|__ZALO_CHAT_ID__|${ZALO_CHAT_ID:-}|" \
     -e "s|__ZALO_MIN_LEVEL__|${ZALO_MIN_LEVEL:-7}|" \
     -e "s|__TELEGRAM_CHAT_ID__|${TELEGRAM_CHAT_ID:-}|" \
     -e "s|__TELEGRAM_MIN_LEVEL__|${TELEGRAM_MIN_LEVEL:-7}|" \
+    -e "s|__TELEGRAM2_CHAT_ID__|${TELEGRAM2_CHAT_ID:-}|" \
+    -e "s|__TELEGRAM2_MIN_LEVEL__|${TELEGRAM2_MIN_LEVEL:-7}|" \
+    -e "s|__TELEGRAM2_GROUP__|${TELEGRAM2_GROUP:-}|" \
     -e "s|__CLUSTER_KEY__|${CLUSTER_KEY}|" \
     config/wazuh_cluster/wazuh_manager.conf.tpl > config/wazuh_cluster/wazuh_manager.conf
 printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
@@ -143,11 +163,18 @@ printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
 install -d -m 700 secrets
 printf '%s' "${ZALO_BOT_TOKEN:-}" > secrets/zalo.token
 printf '%s' "${TELEGRAM_BOT_TOKEN:-}" > secrets/telegram.token
-# "Initial Access=3,Execution=4" -> {"Initial Access": 3, "Execution": 4}
-TELEGRAM_TOPICS="${TELEGRAM_TOPICS:-}" python3 -c '
+# Moi group mot bang: {"<chat id>": {"Initial Access": 3, "dacn_ml": 2}}. Topic id cua group nao chi dung cho group do
+TELEGRAM_TOPICS="${TELEGRAM_TOPICS:-}" TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}" \
+TELEGRAM2_TOPICS="${TELEGRAM2_TOPICS:-}" TELEGRAM2_CHAT_ID="${TELEGRAM2_CHAT_ID:-}" python3 -c '
 import json, os
-pairs = [p.split("=", 1) for p in os.environ["TELEGRAM_TOPICS"].split(",") if "=" in p]
-print(json.dumps({k.strip(): int(v) for k, v in pairs}))' > secrets/telegram_topics.json
+def parse(s):
+    return {k.strip(): int(v) for k, v in (p.split("=", 1) for p in s.split(",") if "=" in p)}
+out = {}
+for c, t in (("TELEGRAM_CHAT_ID", "TELEGRAM_TOPICS"), ("TELEGRAM2_CHAT_ID", "TELEGRAM2_TOPICS")):
+    chat, topics = os.environ[c].strip(), parse(os.environ[t])
+    if chat and topics:
+        out[chat] = topics
+print(json.dumps(out))' > secrets/telegram_topics.json
 chmod 644 secrets/zalo.token secrets/telegram.token secrets/telegram_topics.json
 chmod 600 config/wazuh_cluster/wazuh_manager.conf config/wazuh_cluster/authd.pass
 # integratord chay bang user wazuh, file mount vao la root:root nen phai cho other doc+chay

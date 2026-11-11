@@ -310,6 +310,19 @@
   </integration>
   <!-- END telegram -->
 
+  <!-- BEGIN tg2: group Telegram thu hai (vd group cho nguoi test), CUNG bot/token, chi khac chat id.
+       setup.sh xoa khoi nay neu .env chua co TELEGRAM2_CHAT_ID, xoa dong <group> neu TELEGRAM2_GROUP trong
+       (= nhan moi alert >= level, giong group chinh). Group nay khong dung Topics. -->
+  <integration>
+    <name>custom-telegram</name>
+    <hook_url>https://api.telegram.org</hook_url>
+    <api_key>__TELEGRAM2_CHAT_ID__</api_key>
+    <group>__TELEGRAM2_GROUP__</group>
+    <level>__TELEGRAM2_MIN_LEVEL__</level>
+    <alert_format>json</alert_format>
+  </integration>
+  <!-- END tg2 -->
+
   <cluster>
     <name>wazuh</name>
     <node_name>node01</node_name>
