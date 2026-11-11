@@ -37,6 +37,8 @@ TELEGRAM_TOPICS=
 TELEGRAM2_CHAT_ID=
 TELEGRAM2_MIN_LEVEL=7
 TELEGRAM2_GROUP=
+# Topics cua group thu hai (bat Topics trong group), cung dang, them duoc rule group: "dacn_ml=2,Reconnaissance=3"
+TELEGRAM2_TOPICS=
 
 # --- WAF ---
 WAF_MODE=DetectionOnly
@@ -69,6 +71,7 @@ if ! grep -q '^TELEGRAM2_CHAT_ID=' .env; then
   echo "[+] Them bien Telegram group thu hai vao .env"
   printf '# Group Telegram thu hai, CUNG bot. TELEGRAM2_GROUP trong = moi alert, "dacn_ml" = chi alert model ML\nTELEGRAM2_CHAT_ID=\nTELEGRAM2_MIN_LEVEL=7\nTELEGRAM2_GROUP=\n' >> .env
 fi
+grep -q '^TELEGRAM2_TOPICS=' .env || printf '# Topics group thu hai, vd "dacn_ml=2,Reconnaissance=3" (rule group hoac tactic MITRE)\nTELEGRAM2_TOPICS=\n' >> .env
 
 set -a; . ./.env; set +a
 # Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
@@ -160,14 +163,18 @@ printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass
 install -d -m 700 secrets
 printf '%s' "${ZALO_BOT_TOKEN:-}" > secrets/zalo.token
 printf '%s' "${TELEGRAM_BOT_TOKEN:-}" > secrets/telegram.token
-# "Initial Access=3,Execution=4" -> {"Initial Access": 3, "Execution": 4, "_chat": <chat id group chinh>}
-# "_chat": topic chi ap cho group chinh; group thu hai khong bat Topics, gui message_thread_id se bi loi
-TELEGRAM_TOPICS="${TELEGRAM_TOPICS:-}" TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}" python3 -c '
+# Moi group mot bang: {"<chat id>": {"Initial Access": 3, "dacn_ml": 2}}. Topic id cua group nao chi dung cho group do
+TELEGRAM_TOPICS="${TELEGRAM_TOPICS:-}" TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}" \
+TELEGRAM2_TOPICS="${TELEGRAM2_TOPICS:-}" TELEGRAM2_CHAT_ID="${TELEGRAM2_CHAT_ID:-}" python3 -c '
 import json, os
-pairs = [p.split("=", 1) for p in os.environ["TELEGRAM_TOPICS"].split(",") if "=" in p]
-d = {k.strip(): int(v) for k, v in pairs}
-d["_chat"] = os.environ["TELEGRAM_CHAT_ID"].strip()
-print(json.dumps(d))' > secrets/telegram_topics.json
+def parse(s):
+    return {k.strip(): int(v) for k, v in (p.split("=", 1) for p in s.split(",") if "=" in p)}
+out = {}
+for c, t in (("TELEGRAM_CHAT_ID", "TELEGRAM_TOPICS"), ("TELEGRAM2_CHAT_ID", "TELEGRAM2_TOPICS")):
+    chat, topics = os.environ[c].strip(), parse(os.environ[t])
+    if chat and topics:
+        out[chat] = topics
+print(json.dumps(out))' > secrets/telegram_topics.json
 chmod 644 secrets/zalo.token secrets/telegram.token secrets/telegram_topics.json
 chmod 600 config/wazuh_cluster/wazuh_manager.conf config/wazuh_cluster/authd.pass
 # integratord chay bang user wazuh, file mount vao la root:root nen phai cho other doc+chay

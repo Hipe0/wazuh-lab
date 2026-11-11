@@ -8,8 +8,10 @@
 # message_thread_id. Bang tactic -> thread id do setup.sh ghi tu TELEGRAM_TOPICS trong .env.
 # Alert khong co tactic, hoac tactic khong co trong bang, vao topic General.
 #
-# Group thu hai (TELEGRAM2_CHAT_ID, cung bot) khong dung Topics: chi them message_thread_id khi
-# chat id (argv[2]) trung "_chat" (chat id group chinh) trong file topics.
+# Moi group mot bang topic rieng (TELEGRAM_TOPICS cho group chinh, TELEGRAM2_TOPICS cho group thu hai):
+# setup.sh ghi {"<chat id>": {"<tactic hoac rule group>": thread_id}}. Khoa trung voi rule.groups
+# (vd "dacn_ml") duoc uu tien hon tactic, de alert model ML vao topic rieng. Chat khong co bang -> khong
+# gui message_thread_id (group khong bat Topics se loi "message thread not found").
 import importlib.util
 import json
 import os
@@ -27,21 +29,26 @@ def load_topics():
     try:
         with open(TOPICS_FILE) as f:
             data = json.load(f)
-        main_chat = str(data.pop("_chat", "")).strip()
-        # file cu chua co "_chat" thi giu hanh vi cu (ap topic cho moi chat)
-        if main_chat and len(sys.argv) > 2 and sys.argv[2].strip() != main_chat:
-            return {}
+        chat = sys.argv[2].strip() if len(sys.argv) > 2 else ""
+        if any(isinstance(v, dict) for v in data.values()):
+            data = data.get(chat, {})
+        # file cu dang phang {"tactic": id}: ap cho moi chat nhu truoc
         return {k.strip().lower(): int(v) for k, v in data.items()}
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, TypeError):
         return {}
 
 
 def topic_for(alert):
     topics = load_topics()
+    if not topics:
+        return {}
+    # rule group truoc (vd dacn_ml -> topic ML), roi den tactic MITRE
+    keys = list(zalo.get(alert, "rule.groups") or [])
     # 1 technique co the thuoc nhieu tactic (vd T1053: Execution, Persistence, Privilege Escalation):
     # lay tactic dau tien co topic
-    for tactic in zalo.get(alert, "rule.mitre.tactic") or []:
-        thread = topics.get(str(tactic).lower())
+    keys += list(zalo.get(alert, "rule.mitre.tactic") or [])
+    for key in keys:
+        thread = topics.get(str(key).lower())
         if thread:
             return {"message_thread_id": thread}
     return {}

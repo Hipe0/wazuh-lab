@@ -94,9 +94,10 @@ Kiểm tra cả group: `./check-telegram.sh` (bot còn trong group không, gửi
    - `TELEGRAM2_CHAT_ID`: chat id ở bước 2.
    - `TELEGRAM2_MIN_LEVEL`: mặc định 7, giống group chính.
    - `TELEGRAM2_GROUP`: để trống = nhận mọi alert (SIEM + ML); `dacn_ml` = chỉ alert model ML (khi đó level 12 = chỉ rule 100501, 8 = mọi flow bất thường).
+   - `TELEGRAM2_TOPICS` (tuỳ chọn, group phải bật Topics): cùng dạng `TELEGRAM_TOPICS`, thêm được **rule group** làm khoá, vd `"dacn_ml=2,Reconnaissance=3,Initial Access=4"`. Khoá rule group (alert ML có group `dacn_ml`) được xét trước tactic. Topic id lấy như group chính (số cuối trong link topic); id của group nào chỉ dùng cho group đó.
 4. `./setup.sh && docker compose up -d --force-recreate wazuh.manager`, rồi `./check-telegram.sh` (có thêm dòng `group 2`).
 
-Topics chỉ áp cho group chính (setup.sh ghi chat id group chính vào `secrets/telegram_topics.json` dưới khoá `_chat`), group thứ hai nhận tin thường. Không để `TELEGRAM2_GROUP=dacn_ml` với level 8 lâu: mỗi flow 1 tin, Telegram giới hạn khoảng 20 tin/phút cho 1 group, gửi dồn sẽ bị chặn (lỗi 429 trong `integrations.log`).
+setup.sh ghi `secrets/telegram_topics.json` dạng `{"<chat id>": {"<khoá>": topic_id}}`. Group không có bảng topic thì tin vào General (không gửi `message_thread_id`, tránh lỗi "message thread not found"). Không để `TELEGRAM2_GROUP=dacn_ml` với level 8 lâu: mỗi flow 1 tin, Telegram giới hạn khoảng 20 tin/phút cho 1 group, gửi dồn sẽ bị chặn (lỗi 429 trong `integrations.log`).
 
 Lưu ý: một số nhà mạng ở VN chặn Telegram. Chạy `./preflight.sh` hoặc `curl -m 10 https://api.telegram.org/` trên server trước; bị chặn thì integration chỉ ghi lỗi vào `integrations.log`, Zalo vẫn chạy bình thường.
 
