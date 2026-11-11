@@ -158,7 +158,7 @@
 
 </group>
 
-<!-- NIDS ML (do an): to hop IF + LOF + OCSVM cham diem flow Argus, nids-collector ghi /var/log/nids/alerts.jsonl.
+<!-- ML anomaly (do an, stack ~/ml-anomaly): to hop IF + LOF + OCSVM cham diem flow Argus, nids-collector ghi /var/log/ml-anomaly/alerts.jsonl.
      Chi noi vao Wazuh SAU khi hieu chinh nguong tren traffic benign cua lab, khong thi bao nham nhieu. -->
 <group name="nids,dacn_ml,">
   <rule id="100500" level="8">

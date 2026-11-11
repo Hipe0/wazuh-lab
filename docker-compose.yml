@@ -117,8 +117,8 @@ services:
       - coraza_logs:/var/log/coraza:ro
       # Suricata: eve.json quyen 644, mount thang thu muc (logrotate doi inode)
       - ${SURICATA_LOG_DIR:-/var/log/suricata}:/var/log/suricata:ro
-      # NIDS ML (do an): collector ghi alerts.jsonl, thu muc phai co san tren host (README muc NIDS ML)
-      - ${NIDS_LOG_DIR:-/var/log/nids}:/var/log/nids:ro
+      # ML anomaly (do an, stack ~/ml-anomaly): collector ghi alerts.jsonl, thu muc phai co san tren host (README muc 4e)
+      - ${ML_ANOMALY_LOG_DIR:-/var/log/ml-anomaly}:/var/log/ml-anomaly:ro
     depends_on:
       - wazuh.manager
 
