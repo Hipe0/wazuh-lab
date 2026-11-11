@@ -32,6 +32,9 @@ TELEGRAM_MIN_LEVEL=7
 # Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3".
 # De trong thi gui het vao General
 TELEGRAM_TOPICS=
+# Group rieng cho alert model ML (rule group dacn_ml), cung bot. 12 = chi rule 100501, 8 = moi flow (de bi Telegram chan vi gui qua nhanh)
+TELEGRAM_ML_CHAT_ID=
+TELEGRAM_ML_MIN_LEVEL=12
 
 # --- WAF ---
 WAF_MODE=DetectionOnly
@@ -60,6 +63,10 @@ if ! grep -q '^TELEGRAM_CHAT_ID=' .env; then
   printf '\n# --- Telegram Bot (dien token + chat id roi chay lai ./setup.sh) ---\nTELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nTELEGRAM_MIN_LEVEL=7\n' >> .env
 fi
 grep -q '^TELEGRAM_TOPICS=' .env || printf '# Group bat Topics: tactic MITRE -> message_thread_id, vd "Reconnaissance=2,Initial Access=3"\nTELEGRAM_TOPICS=\n' >> .env
+if ! grep -q '^TELEGRAM_ML_CHAT_ID=' .env; then
+  echo "[+] Them bien Telegram group ML vao .env"
+  printf '# Group rieng cho alert model ML (rule group dacn_ml), cung bot. 12 = chi rule 100501, 8 = moi flow\nTELEGRAM_ML_CHAT_ID=\nTELEGRAM_ML_MIN_LEVEL=12\n' >> .env
+fi
 
 set -a; . ./.env; set +a
 # Token Zalo dang <so>:<chuoi>. Chu "bot" chi nam trong URL (.../bot<TOKEN>/sendMessage),
@@ -130,11 +137,16 @@ if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
   echo "[!] Chua co TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID trong .env: alert se khong ve Telegram"
   STRIP_INT+=(-e '/<!-- BEGIN telegram/,/<!-- END telegram -->/d')
 fi
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ML_CHAT_ID:-}" ]; then
+  STRIP_INT+=(-e '/<!-- BEGIN tgml/,/<!-- END tgml -->/d')
+fi
 sed "${STRIP_INT[@]}" \
     -e "s|__ZALO_CHAT_ID__|${ZALO_CHAT_ID:-}|" \
     -e "s|__ZALO_MIN_LEVEL__|${ZALO_MIN_LEVEL:-7}|" \
     -e "s|__TELEGRAM_CHAT_ID__|${TELEGRAM_CHAT_ID:-}|" \
     -e "s|__TELEGRAM_MIN_LEVEL__|${TELEGRAM_MIN_LEVEL:-7}|" \
+    -e "s|__TELEGRAM_ML_CHAT_ID__|${TELEGRAM_ML_CHAT_ID:-}|" \
+    -e "s|__TELEGRAM_ML_MIN_LEVEL__|${TELEGRAM_ML_MIN_LEVEL:-12}|" \
     -e "s|__CLUSTER_KEY__|${CLUSTER_KEY}|" \
     config/wazuh_cluster/wazuh_manager.conf.tpl > config/wazuh_cluster/wazuh_manager.conf
 printf '%s\n' "$ENROLLMENT_PASSWORD" > config/wazuh_cluster/authd.pass

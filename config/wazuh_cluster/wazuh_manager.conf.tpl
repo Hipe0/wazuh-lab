@@ -310,6 +310,19 @@
   </integration>
   <!-- END telegram -->
 
+  <!-- BEGIN tgml: alert model ML (group dacn_ml) vao group Telegram rieng cho nguoi test, cung bot/token.
+       setup.sh xoa khoi nay neu .env chua co TELEGRAM_ML_CHAT_ID. Wazuh khong loai tru duoc group, nen
+       alert ML level >= TELEGRAM_MIN_LEVEL van ve ca group chinh. -->
+  <integration>
+    <name>custom-telegram</name>
+    <hook_url>https://api.telegram.org</hook_url>
+    <api_key>__TELEGRAM_ML_CHAT_ID__</api_key>
+    <group>dacn_ml</group>
+    <level>__TELEGRAM_ML_MIN_LEVEL__</level>
+    <alert_format>json</alert_format>
+  </integration>
+  <!-- END tgml -->
+
   <cluster>
     <name>wazuh</name>
     <node_name>node01</node_name>

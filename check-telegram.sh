@@ -27,4 +27,10 @@ for name, tid in [("General", None)] + list(topics.items()):
         p["message_thread_id"] = tid
     r = call("sendMessage", **p)
     print(f"{name:22} ->", "OK" if r.get("ok") else r.get("description"))
+ml = env.get("TELEGRAM_ML_CHAT_ID", "").strip('"')
+if ml:
+    g = call("getChat", chat_id=ml)
+    print("group ML:", g.get("result", {}).get("title"), g.get("description", ""))
+    r = call("sendMessage", chat_id=ml, text="[test wazuh-lab] group ML")
+    print(f"{'group ML':22} ->", "OK" if r.get("ok") else r.get("description"))
 EOF
